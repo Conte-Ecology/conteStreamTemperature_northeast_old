@@ -102,15 +102,6 @@ dim(tempFullSync)
 
 # Standardize for Analysis
 
-stdCovs <- function(x, y, varNames){
-  xStd <- as.data.frame(matrix(NA, dim(x)[1], length(varNames)))
-  names(xStd) <- varNames
-  for(i in 1:length(varNames)){
-    xStd[ , varNames[i]] <- (x[ , varNames[i]] - mean(y[ , varNames[i]], na.rm=T)) / sd(y[ , varNames[i]], na.rm=T)
-  }
-  return(xStd)
-}
-
 varNames1 <- names(tempFullSync[ ,9:dim(tempFullSync)[2]])
 
 tempFullStd <- stdCovs(tempFullSync, tempDataSync, varNames1)
@@ -266,38 +257,10 @@ foo <- ggplot(yearPredict, aes(dOY, tempPredicted)) +
   theme(axis.text.x = element_text(angle = 45))
 ggsave(filename=paste0(baseDir, "presentations/yearTemp.png"), plot=foo, dpi=300, width=12, height=8, units="in")
 
-plotPredict <- function(observed, predicted, siteList = "ALL", yearList = "ALL", dir){ # add option to not include predicted or make similar function that makes observation plots
-  if(siteList == "ALL"){
-    sites <- unique(as.character(predicted$site))
-  } else {
-    sites <- siteList
-  }
-  if(yearList == "ALL"){
-    years <- unique(as.character(predicted$year))
-  } else {
-    years <- yearList
-  }
-  
-  for(i in 1:length(unique(sites))){
-    dataSite <- filter(predicted, filter = site == sites[i], year == years)
-    dataSiteObs <- filter(observed, filter = site == sites[i], year == years)
-    foo <- ggplot(dataSite, aes(dOY, tempPredicted)) + 
-      coord_cartesian(xlim = c(100, 300), ylim = c(0, 35)) + 
-      geom_point(data=dataSiteObs, aes(dOY, temp), colour='black') +
-      geom_point(colour = 'blue') + 
-      geom_line(colour = 'blue') + 
-      geom_point(aes(dOY, airTemp), colour = 'red') + 
-      ggtitle(dataSite$site[i]) + 
-      facet_wrap(~year) + 
-      xlab(label = 'Day of the year') + ylab('Temperature (C)') + 
-      theme(axis.text.x = element_text(angle = 45))
-    ggsave(filename=paste0(dir, dataSite$site[i], '.png'), plot=foo, dpi=300 , width=12,height=8, units='in' )
-  } # surprisingly fast but wouldn't do for all catchments
-}
 
-plotPredict(observed = tempDataSync, predicted = tempFull, siteList = "ALL", yearList = "ALL", dir = paste0(dataLocalDir,'/', 'plots/fullRecord/', dataSite$site[i], '.png'))
+# use plotPredict function
+plotPredict(observed = tempDataSync, predicted = tempFull, siteList = "ALL", yearList = "ALL", dir = paste0(dataLocalDir,'/', 'plots/fullRecord/'))
 
-paste0(dataLocalDir,'/', 'plots/fullRecord/', dataSite$site[i], '.png')
 
 yearPredict <- filter(tempFull, site == "MADEP_W0989_T1", year == "2005")
 dataSiteObs <- filter(tempDataSync, filter = site == "MADEP_W0989_T1")

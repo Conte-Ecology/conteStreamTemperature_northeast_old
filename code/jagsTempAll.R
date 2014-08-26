@@ -224,20 +224,22 @@ summary.stats <- summary(M3)
 summary.stats[1:1000, 1:2]
 
 # Make "Fixed Effects" Output like summary(lmer)
-fix.ef <- as.data.frame(matrix(NA, K.0+K+L, 4))
-names(fix.ef) <- c("Mean", "Std. Error", "LCI", "UCI")
-row.names(fix.ef) <- c(variables.fixed, variables.site, variables.year)
-for(k in 1:K.0){
-  fix.ef[k, 1:2] <- summary.stats$statistics[paste0('B.0[',k,']') , c("Mean", "SD")]
-  fix.ef[k, 3:4] <- summary.stats$quantiles[paste0('B.0[',k,']') , c("2.5%", "97.5%")]
-}
-for(k in 1:K){
-  fix.ef[k+K.0, 1:2] <- summary.stats$statistics[paste0('mu.site[',k,']') , c("Mean", "SD")]
-  fix.ef[k+K.0, 3:4] <- summary.stats$quantiles[paste0('mu.site[',k,']') , c("2.5%", "97.5%")]
-}
-for(l in 1:L){
-  fix.ef[l+K.0+K, 1:2] <- summary.stats$statistics[paste0('mu.year[',l,']') , c("Mean", "SD")]
-  fix.ef[l+K.0+K, 3:4] <- summary.stats$quantiles[paste0('mu.year[',l,']') , c("2.5%", "97.5%")]
+codaFixEf <- function (K.0, K, L, variables.fixed, variables.site, variables.year, k, summary.stats, l) {
+  fix.ef <- as.data.frame(matrix(NA, K.0+K+L, 4))
+  names(fix.ef) <- c("Mean", "Std. Error", "LCI", "UCI")
+  row.names(fix.ef) <- c(variables.fixed, variables.site, variables.year)
+  for(k in 1:K.0){
+    fix.ef[k, 1:2] <- summary.stats$statistics[paste0('B.0[',k,']') , c("Mean", "SD")]
+    fix.ef[k, 3:4] <- summary.stats$quantiles[paste0('B.0[',k,']') , c("2.5%", "97.5%")]
+  }
+  for(k in 1:K){
+    fix.ef[k+K.0, 1:2] <- summary.stats$statistics[paste0('mu.site[',k,']') , c("Mean", "SD")]
+    fix.ef[k+K.0, 3:4] <- summary.stats$quantiles[paste0('mu.site[',k,']') , c("2.5%", "97.5%")]
+  }
+  for(l in 1:L){
+    fix.ef[l+K.0+K, 1:2] <- summary.stats$statistics[paste0('mu.year[',l,']') , c("Mean", "SD")]
+    fix.ef[l+K.0+K, 3:4] <- summary.stats$quantiles[paste0('mu.year[',l,']') , c("2.5%", "97.5%")]
+  }
 }
 fix.ef
 

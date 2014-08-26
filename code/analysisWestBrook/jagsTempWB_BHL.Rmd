@@ -11,37 +11,44 @@ rm(list=ls())
 library(ggplot2)
 library(rjags)
 library(devtools)
+library(parallel)
+library(reshape2)
 
 install_github("streamTemperature", username = "Conte-Ecology")
 library(streamTemperature)
 
 setwd('/Users/Dan/Documents/Research/Stream_Climate_Change/temperatureProject/')
+#setwd('D:/projects/temperatureProject/')
 #setwd('C:/Users/dhocking/Documents/temperatureProject/')
 
 #baseDir <- 'C:/KPONEIL/GitHub/projects/temperatureProject/'
 baseDir <- '/Users/Dan/Documents/Research/Stream_Climate_Change/temperatureProject/'
 #baseDir <- 'D:/projects/temperatureProject/'
+#baseDir <- 'D:/projects/temperatureProject/'
 
 dataInDir <- paste0(baseDir, 'dataIn/')
 dataOutDir <- paste0(baseDir, 'dataOut/')
 graphsDir <- paste0(baseDir, 'graphs/')
-dataLocalDir <- paste0(baseDir, 'localData/')
+
+fileOutName <- paste0(dataOutDir,'outP.RData')
+bugsName <- paste0(baseDir,"code/correlatedSlopes.txt")
 
 # source(paste0(baseDir, 'code/functions/temperatureModelingFunctions.R')) # now in streamTemperature package
 
-load(paste0(dataLocalDir, 'etSWB.RData'))
+load(paste0(dataInDir, 'MAUSGS/etSWB.RData'))
 ```
 
 ```{r}
 #################################
 # remove xi then make mu.site and mu.year = 0
-sink("code/jagsWB.txt")
+
+sink(bugsName)
 cat("
     model{
     # Likelihood
     for(i in 1:n){ # n observations
       temp[i] ~ dnorm(stream.mu[i], tau)
-      stream.mu[i] <- inprod(B.0[], X.0[i, ]) + inprod(B.site[site[i], ], X.site[i, ]) + inprod(B.year[year[i], ], X.year[i, ]) #  
+      stream.mu[i] <- inprod(B.0[], X.0[i, ]) + inprod(B.site[site[i], ], X.site[i, ]) + B.year[year[i]] #  
     }
       
     # prior for model variance
@@ -72,9 +79,20 @@ cat("
       sigma.b.site[k] <- sqrt(sigma.B.site[k, k])
     }
     
-    # YEAR EFFECTiS
+    # YEAR EFFECTS
     # Priors for random effects of year
-    for(t in 1:Ti){ # Ti years
+    for(t in 1:Ti){
+    B.year[t] ~ dnorm(0, tau.B.year)
+    }
+    
+    sigma.b.year ~ dunif(0, 100)
+    tau.B.year <- 1 / (sigma.b.year * sigma.b.year)
+  }
+    ", fill = TRUE)
+sink()
+```
+
+for(t in 1:Ti){ # Ti years
       B.year[t, 1:L] ~ dmnorm(mu.year[ ], tau.B.year[ , ])
     }
     mu.year[1] <- 0
@@ -91,11 +109,10 @@ cat("
         rho.B.year[l, l.prime] <- sigma.B.year[l, l.prime]/sqrt(sigma.B.year[l, l]*sigma.B.year[l.prime, l.prime])
       }
       sigma.b.year[l] <- sqrt(sigma.B.year[l, l])
-    }
-  }
-    ", fill = TRUE)
-sink()
-
+      }
+      
+      
+```{r}
 variables.site <- c("Intercept-site",
                     "Air Temperature",
                     "Air Temp Lag1",
@@ -109,22 +126,19 @@ X.site <- data.frame(int = 1,
                      airT1 = etS$airTempLagged1,
                      airT2 = etS$airTempLagged2)
 
-variables.fixed <- c("intercept", "flow")
+variables.fixed <- c("intercept", "flow", "dOY", "dOY2", "dOY3")
 K.0 <- length(variables.fixed)
 X.0 <- data.frame(int = 1,
-                  flow = etS$flow)
+                  flow = etS$flow,
+                  dOY = etS$dOY, 
+                  dOY2 = etS$dOY^2,
+                  dOY3 = etS$dOY^3)
 
-variables.year <- c("Intercept-year",
-                    "dOY",
-                    "dOY2",
-                    "dOY3")
+variables.year <- c("Intercept-year")
 Ti <- length(unique(etS$year))
 L <- length(variables.year)
 W.year <- diag(L)
-X.year <- data.frame(int=1, 
-                     dOY = etS$dOY, 
-                     dOY2 = etS$dOY^2,
-                     dOY3 = etS$dOY^3)
+X.year <- data.frame(int=1)
 
 
 data <- list(n = n, 
@@ -157,34 +171,99 @@ params <- c("sigma",
             "mu.site",
             "sigma.b.site",
             "B.year",
-            "rho.B.year",
-            "mu.year",
+            #"rho.B.year",
+            #"mu.year",
             "sigma.b.year",
-            "stream.mu")
+            "stream.mu",
+            'deviance')
 
 #M1 <- bugs(etS, )
 
-n.burn = 5000
-n.it = 5000
-n.thin = 5
+nAdapt = 500
+nIter = 5000
+nThin = 5
+nChains = 1
 
-library(parallel)
-library(rjags)
+nIterChunk <- 500 #round(nIter/nSave)   # num of iters per chunk
+nSave <- round(nIter/nIterChunk)                       # num of saves
 
-CL <- makeCluster(3)
-clusterExport(cl=CL, list("data", "inits", "params", "K", "J", "Ti", "L", "n", "W.site", "W.year", "X.site", "X.year", "n.burn", "n.it", "n.thin"), envir = environment())
-clusterSetRNGStream(cl=CL, iseed = 2345642)
+nChainsCL <- 3
+cl <- makeCluster(nChainsCL)
+clusterExport(cl=cl, list("data", "inits", "params", "K", "J", "Ti", "L", "n", "W.site", "W.year", "X.site", "X.year", "nChains","nAdapt", "nIterChunk", "nThin",'bugsName'), envir = environment())
+clusterSetRNGStream(cl=cl, iseed = 2345642)
 
-system.time(out <- clusterEvalQ(CL, {
-  library(rjags)
-  load.module('glm')
-  jm <- jags.model("code/jagsWB.txt", data, inits, n.adapt=n.burn, n.chains=1)
-  fm <- coda.samples(jm, params, n.iter = n.it, thin = n.thin)
-  return(as.mcmc(fm))
-}))
+sampleJagsInChunks(cl,fileOutName,bugsName,data,inits,nAdapt,params,nIterChunk,nThin)
+load(fileOutName)  #loads 'outP'                         
+out <- appendJagsChunks( outP,nThin,nIter,nIterChunk )
 
-M3 <- mcmc.list(out)
-stopCluster(CL)
+
+# system.time(out <- clusterEvalQ(CL, {
+#   library(rjags)
+#   load.module('glm')
+#   jm <- jags.model("code/correlatedSlopes.txt", data, inits, n.adapt=n.burn, n.chains=1)
+#   #fm <- coda.samples(jm, params, n.iter = n.it, thin = n.thin)
+#   #return(as.mcmc(fm))
+#   fm <- jags.samples(jm, params, n.iter = n.it, thin = n.thin)
+#   return(fm)
+# }))
+
+
+
+
+```
+
+```{r plots}
+
+#######################################
+## deviance
+#[1, 1:200, 3]
+
+temp2 <- melt(((out$deviance[,,])))
+temp2 <- melt(((out$sigma[,,])))
+ggplot(temp2, aes(Var1,(value), colour=factor(Var2) )) +  
+    geom_point(size=1) +
+    scale_x_continuous('Iteration') +
+    scale_y_continuous('Deviance') +
+    ggtitle('desc')
+
+## B.0
+#[1:2, 1:200, 3]
+
+temp2 <- melt(((out$B.0[,,])))
+temp2 <- melt(((out$mu.year[,,])))
+temp2 <- melt(((out$mu.site[,,])))
+temp2 <- melt(((out$sigma.b.year[,,])))
+temp2 <- melt(((out$B.year[,,])))
+
+
+ggplot(temp2, aes(Var2,(value), colour=factor(Var3) )) +  
+    geom_point(size=1) +
+    scale_x_continuous('Iteration') +
+    scale_y_continuous('Deviance') +
+    stat_smooth()+
+    facet_grid(~Var1)
+
+
+## B.Site
+#[1:4, 1:4, 1:200, 3]
+
+temp2 <- melt(((out$B.site[,,,])))
+
+ggplot(temp2[temp2$Var2==1,], aes(Var3,(value), colour=factor(Var4) )) +  
+    geom_point(size=.25) +
+    scale_x_continuous('Iteration') +
+    scale_y_continuous('Deviance') +
+    stat_smooth()+
+    facet_wrap(Var2~Var1)
+
+```
+
+
+
+
+
+
+```{r summarise output}
 #pdf("/Users/Dan/Dropbox/correlatedSlopes.pdf")
 #plot(M3)
 #dev.off()
