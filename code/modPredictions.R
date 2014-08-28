@@ -6,22 +6,25 @@ rm(list=ls())
 library(ggplot2)
 library(dplyr)
 library(DataCombine) # for the slide function
+library(devtools)
+install_github("conteStreamTemperature", username = "Conte-Ecology")
+library(conteStreamTemperature)
 
 #setwd('/Users/Dan/Documents/Research/Stream_Climate_Change/temperatureProject/')
 #setwd('C:/Users/dhocking/Documents/temperatureProject/')
 
 #baseDir <- 'C:/KPONEIL/GitHub/projects/temperatureProject/'
-baseDir <- '/Users/Dan/Documents/Research/Stream_Climate_Change/temperatureProject/'
+#baseDir <- '/Users/Dan/Documents/Research/Stream_Climate_Change/temperatureProject/'
 #baseDir <- 'C:/Users/dhocking/Documents/temperatureProject/'
-setwd(baseDir)
+baseDir <- getwd()
 
-dataInDir <- paste0(baseDir, 'dataIn/')
-dataOutDir <- paste0(baseDir, 'dataOut/')
-dataLocalDir <- paste0(baseDir, 'localData/')
-graphsDir <- paste0(baseDir, 'graphs/')
+dataInDir <- paste0(baseDir, '/dataIn/')
+dataOutDir <- paste0(baseDir, '/dataOut/')
+dataLocalDir <- paste0(baseDir, '/localData/')
+graphsDir <- paste0(baseDir, '/graphs/')
 
-source(paste0(baseDir, 'code/functions/temperatureModelingFunctions.R'))
-source(paste0(baseDir, 'code/functions/dataIndexingFunctions.R'))
+#source(paste0(baseDir, 'code/functions/temperatureModelingFunctions.R'))
+#source(paste0(baseDir, 'code/functions/dataIndexingFunctions.R'))
 
 load((paste0(dataOutDir, 'modSummary.RData')))
 load(paste0(dataLocalDir, 'daymetFullRecordObservedMASites.RData'))
@@ -30,7 +33,7 @@ load(paste0(dataOutDir, 'tempDataSync.RData'))
 load(paste0(dataOutDir, 'springFallBreakpoints.RData'))
 
 #Northeast
-CTDEP  <- T
+CTDEP  <- F
 MAFW   <- T
 MAUSGS <- T
 MADEP  <- T 
@@ -74,7 +77,7 @@ tempFullSync$Longitude <- tempFullSync$Longitude.x
 ##################
 
 # Order by group and date
-tempFullSync <- tempFullSync[order(tempFullSync$site,tempFullSync$year,tempFullSync$dOY),]
+tempFullSync <- tempFullSync[order(tempFullSync$site,tempFullSync$year,tempFullSync$dOY),] # use dplyr instead
 
 # For checking the order of tempFullSync
 tempFullSync$count <- 1:length(tempFullSync$year)

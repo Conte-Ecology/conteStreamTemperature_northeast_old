@@ -3,21 +3,23 @@ rm(list=ls())
 library(ggplot2)
 library(dplyr)
 library(nlme)
+library(devtools)
+#install_github("conteStreamTemperature", username = "Conte-Ecology")
+library(conteStreamTemperature)
 
 #setwd('/Users/Dan/Documents/Research/Stream_Climate_Change/temperatureProject/')
 #setwd('C:/Users/dhocking/Documents/temperatureProject/')
 
 #baseDir <- 'C:/KPONEIL/GitHub/projects/temperatureProject/'
 #baseDir <- '/Users/Dan/Documents/Research/Stream_Climate_Change/temperatureProject/'
-baseDir <- 'C:/Users/dhocking/Documents/temperatureProject/'
-setwd(baseDir)
+baseDir <- getwd()
 
-dataInDir <- paste0(baseDir, 'dataIn/')
-dataOutDir <- paste0(baseDir, 'dataOut/')
-dataLocalDir <- paste0(baseDir, 'localData/')
-graphsDir <- paste0(baseDir, 'graphs/')
+dataInDir <- paste0(baseDir, '/dataIn/')
+dataOutDir <- paste0(baseDir, '/dataOut/')
+dataLocalDir <- paste0(baseDir, '/localData/')
+graphsDir <- paste0(baseDir, '/graphs/')
 
-source(paste0(baseDir, 'code/functions/temperatureModelingFunctions.R'))
+#source(paste0(baseDir, 'code/functions/temperatureModelingFunctions.R'))
 
 loadLocalData <- F
 
@@ -182,8 +184,8 @@ params <- c("sigma",
             "B.year",
             "rho.B.year",
             "mu.year",
-            "sigma.b.year",
-            "stream.mu")
+            "sigma.b.year")#,
+           # "stream.mu")
 
 #M1 <- bugs(tempDataSyncS, )
 
@@ -224,7 +226,7 @@ summary.stats <- summary(M3)
 summary.stats[1:1000, 1:2]
 
 # Make "Fixed Effects" Output like summary(lmer)
-codaFixEf <- function (K.0, K, L, variables.fixed, variables.site, variables.year, k, summary.stats, l) {
+#codaFixEf <- function (K.0, K, L, variables.fixed, variables.site, variables.year, k, summary.stats, l) {
   fix.ef <- as.data.frame(matrix(NA, K.0+K+L, 4))
   names(fix.ef) <- c("Mean", "Std. Error", "LCI", "UCI")
   row.names(fix.ef) <- c(variables.fixed, variables.site, variables.year)
@@ -240,7 +242,7 @@ codaFixEf <- function (K.0, K, L, variables.fixed, variables.site, variables.yea
     fix.ef[l+K.0+K, 1:2] <- summary.stats$statistics[paste0('mu.year[',l,']') , c("Mean", "SD")]
     fix.ef[l+K.0+K, 3:4] <- summary.stats$quantiles[paste0('mu.year[',l,']') , c("2.5%", "97.5%")]
   }
-}
+#}
 fix.ef
 
 # Make Random Effects Output like summary(lmer)
@@ -310,19 +312,26 @@ cor.year[upper.tri(cor.year, diag=TRUE)] <- ''
 cor.year
 
 # combine model summary results into an S4 Object
-setClass("jagsSummary",
-         representation(fixEf="data.frame",
-                        ranEf="list",
-                        ranCor="list",
-                        BSite="data.frame",
-                        BYear="data.frame"))
+#setClass("jagsSummary",
+ #        representation(fixEf="data.frame",
+  #                      ranEf="list",
+   #                     ranCor="list",
+    #                    BSite="data.frame",
+     #                   BYear="data.frame"))
 
-modSummary <- new("jagsSummary")
-modSummary@fixEf <- fix.ef
-modSummary@ranEf <- list(ranSite=ran.ef.site, ranYear=ran.ef.year)
-modSummary@ranCor <- list(corSite=cor.site, corYear=cor.year)
-modSummary@BSite <- B.site
-modSummary@BYear <- B.year
+#modSummary <- new("jagsSummary")
+#modSummary@fixEf <- fix.ef
+#modSummary@ranEf <- list(ranSite=ran.ef.site, ranYear=ran.ef.year)
+#modSummary@ranCor <- list(corSite=cor.site, corYear=cor.year)
+#modSummary@BSite <- B.site
+#modSummary@BYear <- B.year
+
+modSummary <- NULL
+modSummary$fixEf <- fix.ef
+modSummary$ranEf <- list(ranSite=ran.ef.site, ranYear=ran.ef.year)
+modSummary$ranCor <- list(corSite=cor.site, corYear=cor.year)
+modSummary$BSite <- B.site
+modSummary$BYear <- B.year
 
 modSummary
 str(modSummary)
