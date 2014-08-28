@@ -23,6 +23,7 @@ localData/
 presentations/
 dataOut/tempDataSyncS.RData
 outP.RData
+codaList-M3.RData
 
 # Kyle.ignore
 maps/
