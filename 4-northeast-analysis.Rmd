@@ -5,9 +5,21 @@ date: "August 28, 2014"
 output: html_document
 ---
 
-```{r}
-rm(list=ls())
+```{r results = 'hide'}
+#rm(list=ls())
 
+library(knitr)
+#basename <- gsub(".Rmd", "", knitr:::knit_concord$get("infile"))
+#opts_chunk$set(fig.path = paste("figure/", basename, "-", sep = ""), cache.path = paste("cache/", basename, "/", sep = ""))
+#basename <- "testName"
+#opts_chunk$set(cache.path = paste("cache/", basename, "/", sep = ""))
+#opts_chunk$set(cache = 1)
+#opts_chunk$set(tidy = FALSE, warning = FALSE, message = FALSE, comment = NA, verbose = TRUE)
+
+```
+
+
+```{r results = 'hide', warning=FALSE, message=FALSE}
 library(ggplot2)
 library(dplyr)
 library(nlme)
@@ -19,8 +31,8 @@ library(conteStreamTemperature)
 #setwd('C:/Users/dhocking/Documents/temperatureProject/')
 
 #baseDir <- 'C:/KPONEIL/GitHub/projects/temperatureProject/'
-#baseDir <- '/Users/Dan/Documents/Research/Stream_Climate_Change/temperatureProject/'
-baseDir <- getwd() # works as long as you have the project loaded in RStudio
+#baseDir <- "/Users/Dan/Documents/Research/Stream_Climate_Change/conteStreamTemperature_northeast"
+baseDir <- getwd() # works as long as you have the project loaded in RStudio - does not work for kniting
 
 dataInDir <- paste0(baseDir, '/dataIn/')
 dataOutDir <- paste0(baseDir, '/dataOut/')
@@ -29,18 +41,20 @@ graphsDir <- paste0(baseDir, '/graphs/')
 
 #source(paste0(baseDir, 'code/functions/temperatureModelingFunctions.R'))
 
-loadLocalData <- F
+# load standardized and formatted data created with the 3-statModelPrep.Rmd script
+load(paste0(dataOutDir, 'tempDataSync.RData'))
+```
 
-if(loadLocalData) {
-  load(paste0(dataLocalDir, 'etSCT'))
-} else {
-  load(paste0(dataOutDir, 'tempDataSync.RData'))
-}
+```{r}
+print(getwd())
+```
 
 
+```{r}
 ########## JAGS Model ##############
-
 M3 <- modelRegionalTemp(tempDataSyncS, n.burn = 100, n.it = 100, n.thin = 3, n.chains = 3, coda = TRUE)
+
+```
 
 #pdf("/Users/Dan/Dropbox/correlatedSlopes.pdf")
 pdf("C:/Users/dhocking/Dropbox/correlatedSlopes.pdf")
@@ -172,61 +186,6 @@ str(modSummary)
 
 save(modSummary, file=paste0(dataOutDir, 'modSummary.RData'))
 save(M3, file = paste0(dataOutDir, 'codaList-M3.RData'))
-```
-
-# Do not run below
-
-# Add predicted stream temperatures to dataframe - will do this outside JAGS now
-```{r}
-tempDataSync$streamTempPred <- NA
-tempDataSync$streamTempPredLCI <- NA
-tempDataSync$streamTempPredUCI <- NA
-for(i in 1:n){
-  tempDataSync$streamTempPred[i] <- summary.stats$statistics[paste0('stream.mu[',i,']') , c("Mean")]
-  tempDataSync$streamTempPredLCI[i] <- summary.stats$quantiles[paste0('stream.mu[',i,']') , c("2.5%")]
-  tempDataSync$streamTempPredUCI[i] <- summary.stats$quantiles[paste0('stream.mu[',i,']') , c("97.5%")]
-}
-
-
-########## Check model fit #############
-tempDataSync$err <- tempDataSync$streamTempPred - tempDataSync$temp
-rmse(tempDataSync$err)
-```
-
-# Add fit for validation data
-```{r}
-########################################
-
-############ Plots ###############
-ggplot(tempDataSync, aes(temp, streamTempPred)) + geom_point() +geom_abline(slope=1, intercept=0, colour='red')
-
-ggplot(tempDataSync, aes(airTemp, streamTempPred)) + geom_point(aes(colour = dOY, size=0.5, alpha=0.5)) + facet_grid(. ~ year)
-
-ggplot(tempDataSync, aes(dOY, streamTempPred)) + geom_point(size=0.75) + geom_point(data=tempDataSync, aes(dOY, temp), colour = "red", size=0.75) + facet_grid(. ~ year)
-
-ggplot(tempDataSync, aes(dOY, streamTempPred, colour = year)) + geom_line(size=0.5)
-
-
-ggplot(tempDataSync, aes(dOY, streamTempPred, colour = year)) + geom_point(aes(group = year))
-
-ggplot(tempDataSync, aes(airTemp, streamTempPred)) + geom_line(size = 0.5, alpha = 0.3) + theme_bw() + theme(legend.position="none")
-ggplot(tempDataSync, aes(airTemp, streamTempPred, colour = site)) + geom_point(size = 0.5, alpha = 0.8) + theme_bw() + theme(legend.position="none")
-
-ggplot(tempDataSync, aes(airTemp, streamTempPred, group = site)) + 
-  geom_line(stat='smooth', method='lm', se=F, alpha=0.2, size=0.5, colour='black') + 
-  theme_bw() +
-  theme(legend.position="none") + 
-  xlab('Air Temperature (C)') + 
-  ylab('Predicted Stream Temperature (C)')
-
-# plot observed and predicte vs day of the year for all sites
-sites <- unique(tempDataSync$site)
-
-for(i in 1:length(unique(tempDataSync$site))){
-  dataSite <- filter(tempDataSync, filter = site == sites[i])
-  foo <- ggplot(dataSite, aes(dOY, temp)) + coord_cartesian(xlim = c(50, 350), ylim = c(0, 30)) + geom_point(colour = 'blue') + geom_line(colour = 'blue') + geom_point(aes(dOY, streamTempPred), colour = 'red', size=1) + geom_line(aes(dOY, streamTempPred), colour = 'red', size=0.1) + geom_point(aes(dOY, airTemp), colour='black', size=1) + ggtitle(unique(tempDataSync$fsite)[i]) + facet_wrap(~year) + xlab(label = 'Day of the year') + ylab('Temperature (C)')
-  ggsave(filename=paste0(dataLocalDir,'/', 'plots/', unique(tempDataSync$fsite)[i], '.png'), plot=foo, dpi=300 , width=6,height=4, units='in' )
-} # surprisingly fast
 ```
 
 
