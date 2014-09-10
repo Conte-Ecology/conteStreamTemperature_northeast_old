@@ -67,8 +67,8 @@ library(knitr)
 #opts_chunk$set(fig.path = paste(&quot;figure/&quot;, basename, &quot;-&quot;, sep = &quot;&quot;), cache.path = paste(&quot;cache/&quot;, basename, &quot;/&quot;, sep = &quot;&quot;))
 #basename &lt;- &quot;testName&quot;
 #opts_chunk$set(cache.path = paste(&quot;cache/&quot;, basename, &quot;/&quot;, sep = &quot;&quot;))
-#opts_chunk$set(cache = 1)
-#opts_chunk$set(tidy = FALSE, warning = FALSE, message = FALSE, comment = NA, verbose = TRUE)</code></pre>
+opts_chunk$set(cache = 1)
+opts_chunk$set(tidy = FALSE, warning = FALSE, message = FALSE, comment = NA, verbose = TRUE)</code></pre>
 <pre class="r"><code>library(ggplot2)
 library(dplyr)
 library(nlme)
@@ -93,13 +93,8 @@ graphsDir &lt;- paste0(baseDir, '/graphs/')
 # load standardized and formatted data created with the 3-statModelPrep.Rmd script
 load(paste0(dataOutDir, 'tempDataSync.RData'))</code></pre>
 <pre class="r"><code>print(getwd())</code></pre>
-<pre><code>## [1] &quot;/Users/Dan/Documents/Research/Stream_Climate_Change/conteStreamTemperature_northeast&quot;</code></pre>
 <pre class="r"><code>########## JAGS Model ##############
 M3 &lt;- modelRegionalTemp(tempDataSyncS, n.burn = 100, n.it = 100, n.thin = 3, n.chains = 3, coda = TRUE)</code></pre>
-<pre><code>## Loading required package: coda
-## Loading required package: lattice
-## Linked to JAGS 3.3.0
-## Loaded modules: basemod,bugs</code></pre>
 <div id="pdfusersdandropboxcorrelatedslopes.pdf" class="section level1">
 <h1>pdf(“/Users/Dan/Dropbox/correlatedSlopes.pdf”)</h1>
 <p>pdf(“C:/Users/dhocking/Dropbox/correlatedSlopes.pdf”) plot(M3[ , 1:50]) dev.off()</p>
