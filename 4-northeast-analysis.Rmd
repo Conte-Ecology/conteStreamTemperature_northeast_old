@@ -55,7 +55,7 @@ print(getwd())
 coda.tf <- T # currently only works in full for TRUE (using coda.samples)
 M3 <- modelRegionalTemp(tempDataSyncS, n.burn = 300, n.it = 1000, n.thin = 3, n.chains = 3, coda = coda.tf)
 
-save(M3, file = paste0(dataLocalDir), "northeast-mcmc.RData")
+save(M3, file = paste0(dataLocalDir, "northeast-mcmc.RData"))
 ```
 
 ### Check model convergence

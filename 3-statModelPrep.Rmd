@@ -100,6 +100,68 @@ tempDataSync <- na.omit(tempDataSync) ####### Change this so don't take out NA i
 dim(tempDataSync)
 ```
 
+### Check variables for correlation
+```{r correlation scatterplot matrix}
+# check correlation among potential independent variables
+# Cannot plot all points because will overload the plot and lock the system up - therefore thin first
+pairs.full <- data.frame(lat = tempDataSync$Latitude,
+                    lon = tempDataSync$Longitude,
+                    airTemp = tempDataSync$airTemp, 
+                    precip = tempDataSync$prcp,
+                    drainage = tempDataSync$TotDASqKM,
+                    forest = tempDataSync$Forest,
+                    elevation = tempDataSync$ReachElevationM,
+                    coarseness = tempDataSync$SurficialCoarseC,
+                    wetland = tempDataSync$CONUSWetland,
+                    impoundments = tempDataSync$ImpoundmentsAllSqKM,
+                    swe = tempDataSync$swe,
+                    dOY = tempDataSync$dOY, 
+                    dOY2 = tempDataSync$dOY^2)
+
+pairs.thin <- sample_n(pairs.full, 3000, replace = F)
+
+# Move these into the package as helper functions--------
+## put histograms on the diagonal
+panel.hist <- function(x, ...)
+{
+  usr <- par("usr"); on.exit(par(usr))
+  par(usr = c(usr[1:2], 0, 1.5) )
+  h <- hist(x, plot = FALSE)
+  breaks <- h$breaks; nB <- length(breaks)
+  y <- h$counts; y <- y/max(y)
+  rect(breaks[-nB], 0, breaks[-1], y, col="gray", ...)
+}
+
+panel.cor <- function(x, y, digits=2, prefix="", cex.cor)
+{
+  usr <- par("usr"); on.exit(par(usr))
+  par(usr = c(0, 1, 0, 1))
+  r = (cor(x, y))
+  txt <- format(c(r, 0.123456789), digits=digits)[1]
+  txt <- paste(prefix, txt, sep="")
+  if(missing(cex.cor)) cex <- 0.9/strwidth(txt)
+  text(0.5, 0.5, txt, cex = cex) # * abs(r) # change color to red if >0.7
+}
+#--------
+
+pairs(pairs.thin, upper.panel=panel.smooth, lower.panel=panel.cor, diag.panel=panel.hist)
+
+# impoundments and drainage have some outliers. Look in more detail and reduce dataset to reflect this so inference is not based on a few sites in large drainages with dozens of impoundments. Could also check to make sure these are properly classified and not small tribuaries that get place in the main river (CT) catchment.
+hist(tempDataSync$TotDASqKM)
+dim(tempDataSync)
+length(unique(tempDataSync$site))
+
+tempDataSync <- filter(tempDataSync, filter = TotDASqKM <= 200)
+hist(tempDataSync$TotDASqKM)
+dim(tempDataSync)
+length(unique(tempDataSync$site))
+
+```
+**Inference only on catchments with total drainage area <= 200 km^2
+
+No problems of correlation among these potential independent covariates
+
+### Separate data for fitting (training) and validation
 ```{r separate validation data}
 #Use validation?
 validate = T
