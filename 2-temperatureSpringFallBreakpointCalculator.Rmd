@@ -7,7 +7,7 @@ rm(list=ls())
 library(plyr)
 library(zoo)
 library(devtools)
-install_github("conteStreamTemperature", username = "Conte-Ecology")
+install_github("Conte-Ecology/conteStreamTemperature")
 library(conteStreamTemperature)
 
 # Define base directory

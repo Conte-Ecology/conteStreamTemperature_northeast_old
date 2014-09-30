@@ -3,7 +3,7 @@
       # Likelihood
       for(i in 1:n){ # n observations
         temp[i] ~ dnorm(stream.mu[i], tau)
-        stream.mu[i] <- inprod(B.0[], X.0[i, ]) + inprod(B.site[site[i], ], X.site[i, ]) + inprod(B.year[year[i], ], X.year[i, ]) #  
+        stream.mu[i] <- inprod(B.0[], X.0[i, ]) + inprod(B.site[site[i], ], X.site[i, ]) + inprod(B.huc[huc[i], ], X.site[i, ]) + inprod(B.year[year[i], ], X.year[i, ]) #  
       }
       
       # prior for model variance
@@ -14,24 +14,35 @@
         B.0[k] ~ dnorm(0, 0.001) # priors coefs for fixed effect predictors
       }
       
-      # Priors for random effects of site
-      for(j in 1:J){ # J sites
-        B.site[j, 1:K] ~ dmnorm(mu.site[ ], tau.B.site[ , ])
+      # SITE Effects
+      # Independent priors on random site effects
+      for(k in 1:K) {
+        sigma.b.site[k] ~ dunif(0, 100)
+        tau.b.site[k] <- 1 / (sigma.b.site[k] * sigma.b.site[k])
+        for(j in 1:J){ # J sites
+          B.site[j, k] ~ dnorm(0, tau.b.site[k])
+        }
       }
-      mu.site[1] <- 0
+      
+      # HUC Effects
+      # Priors for random effects of huc
+      for(m in 1:M){ # M hucs
+        B.huc[m, 1:K] ~ dmnorm(mu.huc[ ], tau.B.huc[ , ])
+      }
+      mu.huc[1] <- 0
       for(k in 2:K){
-        mu.site[k] ~ dnorm(0, 0.0001)
+        mu.huc[k] ~ dnorm(0, 0.0001)
       }
       
       # Prior on multivariate normal std deviation
-      tau.B.site[1:K, 1:K] ~ dwish(W.site[ , ], df.site)
-      df.site <- K + 1
-      sigma.B.site[1:K, 1:K] <- inverse(tau.B.site[ , ])
+      tau.B.huc[1:K, 1:K] ~ dwish(W.huc[ , ], df.huc)
+      df.huc <- K + 1
+      sigma.B.huc[1:K, 1:K] <- inverse(tau.B.huc[ , ])
       for(k in 1:K){
         for(k.prime in 1:K){
-          rho.B.site[k, k.prime] <- sigma.B.site[k, k.prime]/sqrt(sigma.B.site[k, k]*sigma.B.site[k.prime, k.prime])
+          rho.B.huc[k, k.prime] <- sigma.B.huc[k, k.prime]/sqrt(sigma.B.huc[k, k]*sigma.B.huc[k.prime, k.prime])
         }
-        sigma.b.site[k] <- sqrt(sigma.B.site[k, k])
+        sigma.b.huc[k] <- sqrt(sigma.B.huc[k, k])
       }
       
       # YEAR EFFECTS
@@ -60,4 +71,4 @@
         residuals[i] <- temp[i] - stream.mu[i]
       }
     }
-    
+      

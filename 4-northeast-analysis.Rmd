@@ -53,9 +53,52 @@ print(getwd())
 ```{r run-model, results = 'hide'}
 ########## JAGS Model ##############
 coda.tf <- T # currently only works in full for TRUE (using coda.samples)
-M3 <- modelRegionalTemp(tempDataSyncS, n.burn = 300, n.it = 1000, n.thin = 3, n.chains = 3, coda = coda.tf)
+M3 <- modelRegionalTemp(tempDataSyncS, n.burn = 300, n.it = 1000, n.thin = 1, n.chains = 3, coda = coda.tf, param.list = c("sigma",
+            "B.0",
+            #"B.site",
+            #"rho.B.site",
+            "mu.site",
+            "sigma.b.site",
+            #"B.huc",
+            #"rho.B.huc",
+            #"B.year",
+            #"rho.B.year",
+            "mu.year",
+            "sigma.b.year"))
 
 save(M3, file = paste0(dataLocalDir, "northeast-mcmc.RData"))
+
+pdf("test.pdf")
+plot(M3)
+dev.off()
+```
+
+```{r test site within HUC model}
+coda.tf <- T # currently only works in full for TRUE (using coda.samples)
+system.time(M.huc <- modelRegionalTempHUC(tempDataSyncS, n.burn = 2000, n.it = 1000, n.thin = 1, nc = 3, coda = coda.tf, param.list = c("sigma",
+            "B.0",
+            #"B.site",
+            #"rho.B.site",
+            #"mu.site",
+            "sigma.b.site",
+            #"B.huc",
+            #"rho.B.huc",
+            "mu.huc",
+            "sigma.b.huc",
+            #"B.year",
+            #"rho.B.year",
+            "mu.year",
+            "sigma.b.year")))
+
+save(M.huc, file = paste0(dataLocalDir, "northeast-mcmc.RData"))
+
+pdf("test-huc.pdf")
+plot(M.huc)
+dev.off()
+
+library(ggmcmc)
+ggs.huc <- ggs(M.huc)
+ggmcmc(ggs.huc, file = "ggmcmc-huc.pdf", plot = c("ggs_density",  "ggs_traceplot", "ggs_running", "ggs_compare_partial", "ggs_autocorrelation", "ggs_crosscorrelation", "ggs_Rhat", "ggs_geweke", "ggs_caterpillar"))
 ```
 
 ### Check model convergence
