@@ -21,6 +21,7 @@ opts_chunk$set(tidy = FALSE, warning = FALSE, message = FALSE, comment = NA, ver
 
 ```{r results = 'hide', warning=FALSE, message=FALSE}
 library(ggplot2)
+library(ggmcmc)
 library(dplyr)
 library(nlme)
 library(devtools)
@@ -75,7 +76,7 @@ dev.off()
 
 ```{r test site within HUC model}
 coda.tf <- T # currently only works in full for TRUE (using coda.samples)
-system.time(M.huc <- modelRegionalTempHUC(tempDataSyncS, n.burn = 2000, n.it = 1000, n.thin = 1, nc = 3, coda = coda.tf, param.list = c("sigma",
+system.time(M.huc <- modelRegionalTempHUC(tempDataSyncS, n.burn = 1000, n.it = 1000, n.thin = 1, nc = 3, coda = coda.tf, param.list = c("sigma",
             "B.0",
             #"B.site",
             #"rho.B.site",
@@ -88,17 +89,37 @@ system.time(M.huc <- modelRegionalTempHUC(tempDataSyncS, n.burn = 2000, n.it = 1
             #"B.year",
             #"rho.B.year",
             "mu.year",
-            "sigma.b.year")))
+            "sigma.b.year",
+            "residuals")))
 
 save(M.huc, file = paste0(dataLocalDir, "northeast-mcmc.RData"))
 
-pdf("test-huc.pdf")
-plot(M.huc)
+#pdf("test-huc.pdf")
+#plot(M.huc)
+#dev.off()
+
+ggs.huc <- ggs(M.huc)
+ggmcmc(ggs.huc, file = "ggmcmc-huc.pdf", family = "mu.huc", plot = c("ggs_density",  "ggs_traceplot", "ggs_running", "ggs_compare_partial", "ggs_autocorrelation", "ggs_crosscorrelation", "ggs_Rhat", "ggs_geweke", "ggs_caterpillar"))
 dev.off()
 
-library(ggmcmc)
-ggs.huc <- ggs(M.huc)
-ggmcmc(ggs.huc, file = "ggmcmc-huc.pdf", plot = c("ggs_density",  "ggs_traceplot", "ggs_running", "ggs_compare_partial", "ggs_autocorrelation", "ggs_crosscorrelation", "ggs_Rhat", "ggs_geweke", "ggs_caterpillar"))
+huc.mat <- as.matrix(M.huc)
+tempDataSyncS$resid.huc <- NA
+for(i in 1:length(tempDataSyncS$temp)) {
+  tempDataSyncS$resid.huc[i] <- mean(huc.mat[ , paste0("residuals[", i, "]")])
+  #  tempDataSyncS$resid.huc[i] <- huc.mat[1 , paste0("residuals[", i, "]")]
+  }
+
+library(hexbin)
+g <- ggplot(tempDataSyncS, aes(temp, resid.huc)) 
+g + geom_point(alpha = 0.3) + geom_smooth() + theme_bw()
+
+g + stat_binhex()
+
+g + geom_point() + geom_density2d()
+
+b <- ggplot(tempDataSyncS, aes(x = HUC8, y = resid.huc))
+b + geom_boxplot() + coord_flip()
+
 ```
 
 ### Check model convergence
@@ -160,15 +181,11 @@ ggplot(temp2[temp2$Var2==1,], aes(Var3,(value), colour=factor(Var4) )) +
 
 ```
 
+```{r ending info}
 
-###### Consider: Slope, Aspect, Dams/Impoundments, Agriculture, Wetland, Coarseness, dayl, srad, swe
+print(sessionInfo())
 
-###### Add correlation structure for Lat-Lon and/or HUC ########
-
-##### Add autoregressive component to the model? #########
-
-##### Add interactions such as airTemp*drainage
-
+```
 
 
 
