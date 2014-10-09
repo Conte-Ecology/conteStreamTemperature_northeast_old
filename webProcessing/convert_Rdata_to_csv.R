@@ -1,8 +1,8 @@
 library(dplyr)
 library(stringr)
 
-BASE_DIR <- 'dataIn'
-OUT_DIR <- 'webProcessing/out'
+BASE_DIR <- '../dataIn'
+OUT_DIR <- 'out'
 if (!file.exists(OUT_DIR)) {
   dir.create(OUT_DIR)
 }
