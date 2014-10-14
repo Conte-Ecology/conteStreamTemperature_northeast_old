@@ -161,7 +161,34 @@ length(unique(tempDataSync$site))
 
 No problems of correlation among these potential independent covariates
 
+
+### Add unique deployment column and create vector to loop through for each unique site-deployment
+
+```{r}
+# sort by site, year, date
+tbl_df(tempDataSync)
+tempDataSync <- arrange(tempDataSync, HUC8, site, date)
+
+# Within each site, if column above doesn't equal date + 1 then start new deployment ID
+# SLOW - consider rewriting or moving to C++
+tempDataSync$deployID <- NA
+tempDataSync$deployID[1] <- 1
+for(i in 2:nrow(tempDataSync)) {
+  if(tempDataSync$site[i] == tempDataSync$site[i-1] & 
+       tempDataSync$date[i] == tempDataSync$date[i -1] + 1) {
+    tempDataSync$deployID[i] <- tempDataSync$deployID[i-1]
+    } else {
+      tempDataSync$deployID[i] <- tempDataSync$deployID[i-1] + 1
+      }
+  }
+
+head(tempDataSync, 100)
+summary(tempDataSync)
+
+```
+
 ### Separate data for fitting (training) and validation
+
 ```{r separate validation data}
 #Use validation?
 validate = T
@@ -199,10 +226,20 @@ tempDataSyncValidS <- cbind(tempDataSyncValid[ ,c(1:15)],
 tempDataSyncValidS$fyear <- as.factor(tempDataSyncValidS$year)
 tempDataSyncValidS$fsite <- as.factor(tempDataSyncValidS$site)
 
-
-
 ```
 
+Need to make a vector to cycle through for doing the autoregressive for each unique deployment
+
+```{r make AR vector}
+deploy.length <- table(tempDataSync$deployID) # named vector, length of each deployment (never longer than the syncronized season)
+
+deploy.cumsum <- cumsum(deploy.length)
+
+deploy.vect <- c(0, deploy.cumsum) + 1
+
+# Now do this for the validation data? Needed for predictions?
+
+```
 
 ```{r save tempDataSync for use in analysis}
 

@@ -6,7 +6,7 @@ output: html_document
 ---
 
 ```{r}
-rm(list=ls())
+#rm(list=ls())
 
 #library(devtools)
 # devtools::install_github("hadley/dplyr") # not working
@@ -15,7 +15,7 @@ library(ggplot2)
 library(dplyr)
 library(DataCombine) # for the slide function
 library(devtools)
-install_github("conteStreamTemperature", username = "Conte-Ecology")
+install_github("Conte-Ecology/conteStreamTemperature")
 library(conteStreamTemperature)
 
 #setwd('/Users/Dan/Documents/Research/Stream_Climate_Change/temperatureProject/')
@@ -39,7 +39,11 @@ load(paste0(dataLocalDir, 'daymetFullRecordObservedMASites.RData'))
 load(paste0(dataOutDir, 'tempDataSync.RData'))
 
 load(paste0(dataOutDir, 'springFallBreakpoints.RData'))
+```
 
+Make the data prep and standardization into a function
+
+```{r}
 #Northeast
 CTDEP  <- F
 MAFW   <- T
@@ -138,12 +142,24 @@ BYear <- modSummary@BYear
 
 tempFullSyncS$cYear <- as.character(tempFullSyncS$year)
 
-
+```
 
 
 
 
 # Split data by site-year then do predictions for those with observed stream temperature data and those without, then recombine. The problem is that sites outside of the years observed won't get the site-specific values and years with data but at different sites won't get the site-specific data.
+
+**Need to make this more general so it doesn't have to be changed when the variables in the model or in the random vs. fixed effects change**
+
+```{r}
+
+
+
+
+```
+
+
+```{r}
 tempFullSyncS$siteYear <- paste0(tempFullSyncS$site, tempFullSyncS$year)
 tempDataSyncS$siteYear <- paste0(tempDataSyncS$site, tempDataSyncS$year)
 
@@ -207,7 +223,7 @@ save(tempFullS, tempFull, modSummary, file = "localData/model-summary-prediction
 ```
 
 ```{r}
-# plot observed and predicte vs day of the year for all sites in all years
+# plot observed and predicted vs day of the year for all sites in all years
 sites <- unique(as.character(tempFull$site))
 
 for(i in 1:length(unique(tempFull$site))){

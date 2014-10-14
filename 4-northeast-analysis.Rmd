@@ -54,7 +54,7 @@ print(getwd())
 ```{r run-model, results = 'hide'}
 ########## JAGS Model ##############
 coda.tf <- T # currently only works in full for TRUE (using coda.samples)
-M3 <- modelRegionalTemp(tempDataSyncS, n.burn = 300, n.it = 1000, n.thin = 1, n.chains = 3, coda = coda.tf, param.list = c("sigma",
+M3 <- modelRegionalTemp(tempDataSyncS, n.burn = 1000, n.it = 1000, n.thin = 1, n.chains = 3, coda = coda.tf, param.list = c("sigma",
             "B.0",
             #"B.site",
             #"rho.B.site",
@@ -74,33 +74,151 @@ plot(M3)
 dev.off()
 ```
 
-```{r test site within HUC model}
-coda.tf <- T # currently only works in full for TRUE (using coda.samples)
-system.time(M.huc <- modelRegionalTempHUC(tempDataSyncS, n.burn = 1000, n.it = 1000, n.thin = 1, nc = 3, coda = coda.tf, param.list = c("sigma",
+```{r test site within HUC model with residual AR1}
+######
+# rename all variables before setting the fixed and random, then select them by list
+####
+data.fixed <- data.frame(intercept = 1,
+                    lat = tempDataSyncS$Latitude,
+                    lon = tempDataSyncS$Longitude,
+                    drainage = tempDataSyncS$TotDASqKM,
+                    forest = tempDataSyncS$Forest,
+                    elevation = tempDataSyncS$ReachElevationM,
+                    coarseness = tempDataSyncS$SurficialCoarseC,
+                    wetland = tempDataSyncS$CONUSWetland,
+                    impoundments = tempDataSyncS$ImpoundmentsAllSqKM)
+
+data.random.sites <- data.frame(intercept.site = 1, 
+                     airTemp = tempDataSyncS$airTemp, 
+                     #airTempLag1 = tempDataSyncS$airTempLagged1,
+                     airTempLag2 = tempDataSyncS$airTempLagged2,
+                     precip = tempDataSyncS$prcp,
+                     precipLag1 = tempDataSyncS$prcpLagged1,
+                     #precipLag2 = tempDataSyncS$prcpLagged2,
+                     airT.drainage = tempDataSyncS$airTemp * tempDataSyncS$TotDASqKM, # effect of interaction with random and fixed effects?
+                     airT.precip = tempDataSyncS$airTemp * tempDataSyncS$prcp,
+                     airT.precip2 = tempDataSyncS$airTemp * tempDataSyncS$prcpLagged1) # , swe = tempDataSyncS$swe
+
+data.random.years <- data.frame(intercept.year = 1, 
+                     dOY = tempDataSyncS$dOY, 
+                     dOY2 = tempDataSyncS$dOY^2,
+                     dOY3 = tempDataSyncS$dOY^3)
+
+monitor.params <- c("residuals",
+            "deviance",
+            "sigma",
+            "B.ar1",
             "B.0",
-            #"B.site",
-            #"rho.B.site",
-            #"mu.site",
+            "B.site",
+            "rho.B.site",
+            "mu.site",
             "sigma.b.site",
-            #"B.huc",
-            #"rho.B.huc",
+            "B.huc",
+            "rho.B.huc",
             "mu.huc",
             "sigma.b.huc",
-            #"B.year",
-            #"rho.B.year",
+            "B.year",
+            "rho.B.year",
             "mu.year",
-            "sigma.b.year",
-            "residuals")))
+            "sigma.b.year")
+
+coda.tf <- T # currently only works in full for TRUE (using coda.samples)
+system.time(M.ar1 <- modelRegionalTempAR1(tempDataSyncS, data.fixed=data.fixed, data.random.sites=data.random.sites, data.random.years=data.random.years, deployments = deploy.vect, n.burn = 3000, n.it = 1000, n.thin = 1, nc = 3, coda = coda.tf, param.list = monitor.params)) # Slow with AR1: ~3-6 min per 100 iterations 
+
+save(M.ar1, file = paste0(dataLocalDir, "northeast-mcmc.RData"))
+
+#pdf("test-huc.pdf")
+#plot(M.huc)
+#dev.off()
+```
+
+## Evaluate MCMC Iterations
+```{r check model convergence and mixing}
+ggs.ar1 <- ggs(M.ar1) # slow and memory intensive
+
+ggmcmc(ggs.ar1, file = "ggmcmc-ar1.pdf", family = "mu.huc", plot = c("ggs_density",  "ggs_traceplot", "ggs_running", "ggs_compare_partial", "ggs_autocorrelation", "ggs_crosscorrelation", "ggs_Rhat", "ggs_geweke", "ggs_caterpillar"))
+dev.off()
+
+ggs_traceplot(ggs.ar1, family = "B.0")
+ggs_traceplot(ggs.ar1, family = "mu.huc")
+ggs_traceplot(ggs.ar1, family = "mu.year")
+ggs_traceplot(ggs.ar1, family = "B.ar1")
+ggs_traceplot(ggs.ar1, family = "sigma.b.site") # no mixing of precipLag2 variance
+ggs_traceplot(ggs.ar1, family = "sigma.b.huc")
+ggs_traceplot(ggs.ar1, family = "sigma.b.year")
+ggmcmc(ggs.ar1, file = 'localData/ggmcmc-ar1-rho-huc.pdf', family = "rho.B.huc", plot = "ggs_traceplot")
+
+ar1.mat <- as.matrix(M.ar1)
+tempDataSyncS$resid.ar1 <- NA
+for(i in 1:length(tempDataSyncS$temp)) {
+  tempDataSyncS$resid.ar1[i] <- mean(ar1.mat[ , paste0("residuals[", i, "]")])
+  }
+```
+
+
+
+
+```{r test site within HUC model}
+######
+# rename all variables before setting the fixed and random, then select them by list
+####
+data.fixed <- data.frame(intercept = 1,
+                    lat = tempDataSyncS$Latitude,
+                    lon = tempDataSyncS$Longitude,
+                    drainage = tempDataSyncS$TotDASqKM,
+                    forest = tempDataSyncS$Forest,
+                    elevation = tempDataSyncS$ReachElevationM,
+                    coarseness = tempDataSyncS$SurficialCoarseC,
+                    wetland = tempDataSyncS$CONUSWetland,
+                    impoundments = tempDataSyncS$ImpoundmentsAllSqKM)
+
+data.random.sites <- data.frame(intercept.site = 1, 
+                     airTemp = tempDataSyncS$airTemp, 
+                     #airTempLag1 = tempDataSyncS$airTempLagged1,
+                     airTempLag2 = tempDataSyncS$airTempLagged2,
+                     precip = tempDataSyncS$prcp,
+                     precipLag1 = tempDataSyncS$prcpLagged1,
+                     precipLag2 = tempDataSyncS$prcpLagged2) # , swe = tempDataSyncS$swe
+
+data.random.years <- data.frame(intercept.year = 1, 
+                     dOY = tempDataSyncS$dOY, 
+                     dOY2 = tempDataSyncS$dOY^2,
+                     dOY3 = tempDataSyncS$dOY^3)
+
+monitor.params <- c("residuals",
+            "deviance",
+            "sigma",
+            "B.0",
+            "B.site",
+            "rho.B.site",
+            "mu.site",
+            "sigma.b.site",
+            "B.huc",
+            "rho.B.huc",
+            "mu.huc",
+            "sigma.b.huc",
+            "B.year",
+            "rho.B.year",
+            "mu.year",
+            "sigma.b.year")
+
+coda.tf <- T # currently only works in full for TRUE (using coda.samples)
+system.time(M.huc <- modelRegionalTempHUC(tempDataSyncS, data.fixed=data.fixed, data.random.sites=data.random.sites, data.random.years=data.random.years, n.burn = 1000, n.it = 1000, n.thin = 1, nc = 3, coda = coda.tf, param.list = monitor.params))
 
 save(M.huc, file = paste0(dataLocalDir, "northeast-mcmc.RData"))
 
 #pdf("test-huc.pdf")
 #plot(M.huc)
 #dev.off()
+```
 
+## Evaluate MCMC Iterations
+```{r check model convergence and mixing}
 ggs.huc <- ggs(M.huc)
 ggmcmc(ggs.huc, file = "ggmcmc-huc.pdf", family = "mu.huc", plot = c("ggs_density",  "ggs_traceplot", "ggs_running", "ggs_compare_partial", "ggs_autocorrelation", "ggs_crosscorrelation", "ggs_Rhat", "ggs_geweke", "ggs_caterpillar"))
 dev.off()
+
+ggs_traceplot(ggs.huc, family = "mu.huc")
 
 huc.mat <- as.matrix(M.huc)
 tempDataSyncS$resid.huc <- NA
@@ -108,17 +226,47 @@ for(i in 1:length(tempDataSyncS$temp)) {
   tempDataSyncS$resid.huc[i] <- mean(huc.mat[ , paste0("residuals[", i, "]")])
   #  tempDataSyncS$resid.huc[i] <- huc.mat[1 , paste0("residuals[", i, "]")]
   }
+```
 
-library(hexbin)
-g <- ggplot(tempDataSyncS, aes(temp, resid.huc)) 
+## Check model fit
+```{r check model fit}
+#------ Check residual patterns------
+# Observed vs Residuals
+g <- ggplot(tempDataSyncS, aes(temp, resid.ar1)) 
 g + geom_point(alpha = 0.3) + geom_smooth() + theme_bw()
 
-g + stat_binhex()
+library(hexbin)
+g + stat_binhex(bins = 100) + geom_smooth() + theme_bw()
 
 g + geom_point() + geom_density2d()
 
-b <- ggplot(tempDataSyncS, aes(x = HUC8, y = resid.huc))
+# Residuals by random HUC8
+b <- ggplot(tempDataSyncS, aes(x = HUC8, y = resid.ar1))
 b + geom_boxplot() + coord_flip()
+
+# Residuals by random site within HUC8
+b <- ggplot(tempDataSyncS, aes(x = site, y = resid.ar1))
+b + geom_boxplot() + coord_flip()
+
+# Residuals by random year
+ggplot(tempDataSyncS, aes(x = as.factor(year), y = resid.ar1)) + geom_boxplot() + coord_flip()
+
+# Residuals by covariates
+ggplot(tempDataSyncS, aes(Forest, resid.ar1)) + geom_point(alpha = 0.5) + geom_smooth() + theme_bw()
+
+ggplot(tempDataSyncS, aes(airTemp, resid.ar1)) + geom_point(alpha = 0.5) + geom_smooth() + theme_bw()
+
+ggplot(tempDataSyncS, aes(dOY, resid.ar1)) + geom_point(alpha = 0.5) + geom_smooth() + theme_bw()
+
+ggplot(tempDataSyncS, aes(dOY^2, resid.ar1)) + geom_point(alpha = 0.5) + geom_smooth() + theme_bw()
+
+# Check Autocorrelation of residuals
+# correlation in MCMC
+acf(ar1.mat[ , "residuals[1]"], lag.max = 40, xlab = "Lag", ylab = "Correlation", main = "")
+acf(ar1.mat[ , "residuals[2]"], lag.max = 40, xlab = "Lag", ylab = "Correlation", main = "")
+
+# correlation in residuals over time 
+acf(tempDataSyncS$resid.ar1, lag.max = 100, xlab = "Lag", ylab = "Correlation", main = "") # not perfect but better than for non-AR model
 
 ```
 
