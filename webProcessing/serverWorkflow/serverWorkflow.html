@@ -72,6 +72,8 @@ if (window.hljs && document.readyState && document.readyState === "complete") {
 <li><a href="#prepare-model-input-dataset"><span class="toc-section-number">6</span> Prepare Model Input Dataset</a></li>
 <li><a href="#run-model"><span class="toc-section-number">7</span> Run Model</a></li>
 <li><a href="#summarize-model"><span class="toc-section-number">8</span> Summarize Model</a></li>
+<li><a href="#server-deployment"><span class="toc-section-number">9</span> Server Deployment</a></li>
+<li><a href="#predictions"><span class="toc-section-number">10</span> Predictions</a></li>
 </ul>
 </div>
 
@@ -402,6 +404,29 @@ write(toJSON(attributes(modSummary), pretty=TRUE), 'modSummary.json')</code></pr
     },
     ...
 }</code></pre>
+</div>
+<div id="server-deployment" class="section level1">
+<h1><span class="header-section-number">9</span> Server Deployment</h1>
+<p>To run this system on the server, a bash script will be created that runs each script sequentially. Note that by using command line arguments to specify the input and output file locations, we can use the same scripts to run the model with different datasets. For example, the bash script could be configured to take a single directory as an input, and to write all input and output files to that directory. This will let us keep previous model runs without having to overwrite each input/output file. These files can also be accessed using RStudio Server directly, so each model run can be manually inspected in a regular RStudio IDE (that runs through a web page).</p>
+<p>As an example, when a new model run is requested, the server will run the following command to call the temperature_model bash script. The argument specifies a date/timestamp for naming the directory of this model run.</p>
+<pre><code>$ bash temperature_model.sh 20141015_1550</code></pre>
+<p>This bashscript will then call each of the scripts, saving the input and output files to the specified folder. Note that <code>$1</code> is a reference to the argument, which in this case would be <code>20141015_1550</code></p>
+<pre><code>mkdir $1
+psql -d conte_dev -f retrieve_temperature.sql -q
+mv temperatureData.csv $1/temperatureData.csv
+psql -d conte_dev -f `retrieve_covariates.sql` -q
+mv covariateData.csv $1/covariateData.csv
+# add another script to convert the temperatureData and covariateData csv files to RData files
+# and create masterData based on code above
+Rscript breakpoints.R $1/masterData.RData $1/covariateData.RData $1/springFallBPs.RData 
+Rscript prepare_model_data.R $1/masterData.RData $1/covariateData.RData $1/springFallBPs.RData $1/tempDataSync.RData
+Rscript run_model $1/tempDataSync.RData $1/jags.RData
+Rscript summarize $1/tempDataSync.RData $1/jags.RData $1/modSummary.RData</code></pre>
+<p>After this script runs, all input and output files will be saved in a single folder. A final script could then be run to convert the model summary to json, and upload to the database.</p>
+</div>
+<div id="predictions" class="section level1">
+<h1><span class="header-section-number">10</span> Predictions</h1>
+<p>Once the model summary is saved to the database, a script could be written to retrieve a specific model summary (e.g. set of coefficients) and climate data from the database, and to generate a dataset of predictions. Similar idea would be used via bash scripts and Rscript.</p>
 </div>
 
 
