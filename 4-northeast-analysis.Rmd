@@ -25,7 +25,7 @@ library(ggmcmc)
 library(dplyr)
 library(nlme)
 library(devtools)
-#install_github("conteStreamTemperature", username = "Conte-Ecology")
+install_github("Conte-Ecology/conteStreamTemperature")
 library(conteStreamTemperature)
 
 #setwd('/Users/Dan/Documents/Research/Stream_Climate_Change/temperatureProject/')
@@ -86,7 +86,8 @@ data.fixed <- data.frame(intercept = 1,
                     elevation = tempDataSyncS$ReachElevationM,
                     coarseness = tempDataSyncS$SurficialCoarseC,
                     wetland = tempDataSyncS$CONUSWetland,
-                    impoundments = tempDataSyncS$ImpoundmentsAllSqKM)
+                    impoundments = tempDataSyncS$ImpoundmentsAllSqKM,
+                    airT.drainage = tempDataSyncS$airTemp * tempDataSyncS$TotDASqKM)
 
 data.random.sites <- data.frame(intercept.site = 1, 
                      airTemp = tempDataSyncS$airTemp, 
@@ -95,9 +96,8 @@ data.random.sites <- data.frame(intercept.site = 1,
                      precip = tempDataSyncS$prcp,
                      precipLag1 = tempDataSyncS$prcpLagged1,
                      #precipLag2 = tempDataSyncS$prcpLagged2,
-                     airT.drainage = tempDataSyncS$airTemp * tempDataSyncS$TotDASqKM, # effect of interaction with random and fixed effects?
-                     airT.precip = tempDataSyncS$airTemp * tempDataSyncS$prcp,
-                     airT.precip2 = tempDataSyncS$airTemp * tempDataSyncS$prcpLagged1) # , swe = tempDataSyncS$swe
+                    # effect of interaction with random and fixed effects?
+                     airT.precip = tempDataSyncS$airTemp * tempDataSyncS$prcp) # airT.precip2 = tempDataSyncS$airTemp * tempDataSyncS$prcpLagged1 - doesn't converge
 
 data.random.years <- data.frame(intercept.year = 1, 
                      dOY = tempDataSyncS$dOY, 
@@ -108,6 +108,8 @@ monitor.params <- c("residuals",
             "deviance",
             "sigma",
             "B.ar1",
+            "mu.ar1",
+            "sigma.ar1",
             "B.0",
             "B.site",
             "rho.B.site",
@@ -123,7 +125,7 @@ monitor.params <- c("residuals",
             "sigma.b.year")
 
 coda.tf <- T # currently only works in full for TRUE (using coda.samples)
-system.time(M.ar1 <- modelRegionalTempAR1(tempDataSyncS, data.fixed=data.fixed, data.random.sites=data.random.sites, data.random.years=data.random.years, deployments = deploy.vect, n.burn = 3000, n.it = 1000, n.thin = 1, nc = 3, coda = coda.tf, param.list = monitor.params)) # Slow with AR1: ~3-6 min per 100 iterations 
+system.time(M.ar1 <- modelRegionalTempAR1(tempDataSyncS, data.fixed=data.fixed, data.random.sites=data.random.sites, data.random.years=data.random.years, deployments = deploy.vect, n.burn = 500, n.it = 500, n.thin = 1, nc = 3, coda = coda.tf, param.list = monitor.params)) # Slow with AR1: ~3-6 min per 100 iterations (13 min per 100 iter for site AR)
 
 save(M.ar1, file = paste0(dataLocalDir, "northeast-mcmc.RData"))
 
@@ -134,19 +136,40 @@ save(M.ar1, file = paste0(dataLocalDir, "northeast-mcmc.RData"))
 
 ## Evaluate MCMC Iterations
 ```{r check model convergence and mixing}
-ggs.ar1 <- ggs(M.ar1) # slow and memory intensive
+#ggs.ar1 <- ggs(M.ar1) # slow and memory intensive
 
-ggmcmc(ggs.ar1, file = "ggmcmc-ar1.pdf", family = "mu.huc", plot = c("ggs_density",  "ggs_traceplot", "ggs_running", "ggs_compare_partial", "ggs_autocorrelation", "ggs_crosscorrelation", "ggs_Rhat", "ggs_geweke", "ggs_caterpillar"))
-dev.off()
+#ggmcmc(ggs.ar1, file = "ggmcmc-ar1.pdf", family = "mu.huc", plot = c("ggs_density",  "ggs_traceplot", "ggs_running", "ggs_compare_partial", "ggs_autocorrelation", "ggs_crosscorrelation", "ggs_Rhat", "ggs_geweke", "ggs_caterpillar"))
+#dev.off()
 
-ggs_traceplot(ggs.ar1, family = "B.0")
-ggs_traceplot(ggs.ar1, family = "mu.huc")
-ggs_traceplot(ggs.ar1, family = "mu.year")
-ggs_traceplot(ggs.ar1, family = "B.ar1")
-ggs_traceplot(ggs.ar1, family = "sigma.b.site") # no mixing of precipLag2 variance
-ggs_traceplot(ggs.ar1, family = "sigma.b.huc")
-ggs_traceplot(ggs.ar1, family = "sigma.b.year")
-ggmcmc(ggs.ar1, file = 'localData/ggmcmc-ar1-rho-huc.pdf', family = "rho.B.huc", plot = "ggs_traceplot")
+ggs.ar1.B.0 <- ggs(M.ar1, family = "B.0")
+ggs_traceplot(ggs.ar1.B.0, family = "B.0")
+
+ggs.ar1.mu.huc <- ggs(M.ar1, family = "mu.huc")
+ggs_traceplot(ggs.ar1.mu.huc, family = "mu.huc")
+
+ggs.ar1.mu.year <- ggs(M.ar1, family = "mu.year")
+ggs_traceplot(ggs.ar1.mu.year, family = "mu.year")
+
+ggs.ar1.mu.ar1 <- ggs(M.ar1, family = "mu.ar1")
+ggs_traceplot(ggs.ar1.mu.ar1, family = "mu.ar1")
+
+ggs.ar1.sigma.ar1 <- ggs(M.ar1, family = "sigma.ar1")
+ggs_traceplot(ggs.ar1.sigma.ar1, family = "sigma.ar1")
+
+ggs.ar1.sigma.b.site <- ggs(M.ar1, family = "sigma.b.site")
+ggs_traceplot(ggs.ar1.sigma.b.site, family = "sigma.b.site")
+
+ggs.ar1.sigma.b.huc <- ggs(M.ar1, family = "sigma.b.huc")
+ggs_traceplot(ggs.ar1.sigma.b.huc, family = "sigma.b.huc")
+
+ggs.ar1.sigma.b.year <- ggs(M.ar1, family = "sigma.b.year")
+ggs_traceplot(ggs.ar1.sigma.b.year, family = "sigma.b.year")
+
+ggs.ar1.rho.huc <- ggs(M.ar1, family = "rho.B.huc")
+ggmcmc(ggs.ar1.rho.huc, file = 'localData/ggmcmc-ar1-rho-huc.pdf', family = "rho.B.huc", plot = "ggs_traceplot")
+
+ggs.ar1.B.ar1 <- ggs(M.ar1, family = "B.ar1")
+ggmcmc(ggs.ar1.B.ar1, file = 'localData/ggmcmc-ar1-B-ar1.pdf', family = "B.ar1", plot = c("ggs_traceplot", "ggs_compare_partial", "ggs_autocorrelation"))
 
 ar1.mat <- as.matrix(M.ar1)
 tempDataSyncS$resid.ar1 <- NA
@@ -232,13 +255,13 @@ for(i in 1:length(tempDataSyncS$temp)) {
 ```{r check model fit}
 #------ Check residual patterns------
 # Observed vs Residuals
-g <- ggplot(tempDataSyncS, aes(temp, resid.ar1)) 
-g + geom_point(alpha = 0.3) + geom_smooth() + theme_bw()
+#g <- ggplot(tempDataSyncS, aes(temp, resid.ar1)) 
+#g + geom_point(alpha = 0.3) + geom_smooth() + theme_bw()
 
 library(hexbin)
 g + stat_binhex(bins = 100) + geom_smooth() + theme_bw()
 
-g + geom_point() + geom_density2d()
+g + geom_point() + geom_density2d() + geom_smooth() + theme_bw()
 
 # Residuals by random HUC8
 b <- ggplot(tempDataSyncS, aes(x = HUC8, y = resid.ar1))

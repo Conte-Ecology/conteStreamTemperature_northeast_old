@@ -162,31 +162,6 @@ length(unique(tempDataSync$site))
 No problems of correlation among these potential independent covariates
 
 
-### Add unique deployment column and create vector to loop through for each unique site-deployment
-
-```{r}
-# sort by site, year, date
-tbl_df(tempDataSync)
-tempDataSync <- arrange(tempDataSync, HUC8, site, date)
-
-# Within each site, if column above doesn't equal date + 1 then start new deployment ID
-# SLOW - consider rewriting or moving to C++
-tempDataSync$deployID <- NA
-tempDataSync$deployID[1] <- 1
-for(i in 2:nrow(tempDataSync)) {
-  if(tempDataSync$site[i] == tempDataSync$site[i-1] & 
-       tempDataSync$date[i] == tempDataSync$date[i -1] + 1) {
-    tempDataSync$deployID[i] <- tempDataSync$deployID[i-1]
-    } else {
-      tempDataSync$deployID[i] <- tempDataSync$deployID[i-1] + 1
-      }
-  }
-
-head(tempDataSync, 100)
-summary(tempDataSync)
-
-```
-
 ### Separate data for fitting (training) and validation
 
 ```{r separate validation data}
@@ -228,6 +203,31 @@ tempDataSyncValidS$fsite <- as.factor(tempDataSyncValidS$site)
 
 ```
 
+### Add unique deployment column and create vector to loop through for each unique site-deployment
+
+```{r}
+# sort by site, year, date
+tbl_df(tempDataSync)
+tempDataSync <- arrange(tempDataSync, HUC8, site, date)
+
+# Within each site, if column above doesn't equal date + 1 then start new deployment ID
+# SLOW - consider rewriting or moving to C++
+tempDataSync$deployID <- NA
+tempDataSync$deployID[1] <- 1
+for(i in 2:nrow(tempDataSync)) {
+  if(tempDataSync$site[i] == tempDataSync$site[i-1] & 
+       tempDataSync$date[i] == tempDataSync$date[i -1] + 1) {
+    tempDataSync$deployID[i] <- tempDataSync$deployID[i-1]
+    } else {
+      tempDataSync$deployID[i] <- tempDataSync$deployID[i-1] + 1
+      }
+  }
+
+head(tempDataSync, 100)
+summary(tempDataSync)
+
+```
+
 Need to make a vector to cycle through for doing the autoregressive for each unique deployment
 
 ```{r make AR vector}
@@ -243,7 +243,7 @@ deploy.vect <- c(0, deploy.cumsum) + 1
 
 ```{r save tempDataSync for use in analysis}
 
-save(tempDataSync, tempDataSyncS, tempDataSyncValid, tempDataSyncValidS, file=paste0(dataOutDir, 'tempDataSync.RData'))
+save(tempDataSync, tempDataSyncS, tempDataSyncValid, tempDataSyncValidS, deploy.vect, file=paste0(dataOutDir, 'tempDataSync.RData'))
 
 ```
 
@@ -267,5 +267,4 @@ for (i in 1:nrow(siteYearCombos)){
   tempDataSync$prcp5Day[currSite] <- currMean
 }
 ----------------------------------------------------------------------------------------------------------------------------------------------------------------
-
 

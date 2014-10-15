@@ -160,6 +160,8 @@ head(modSummary@BSite)
 head(modSummary@BHUC)
 head(modSummary@BYear)
 
+rmse(tempDataSyncS$resid.ar1)
+
 save(modSummary, file=paste0(dataOutDir, 'modSummary.RData'))
 ```
 
