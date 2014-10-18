@@ -23,6 +23,84 @@ n <- dim(tempDataSyncS)[1]
 M <- length(unique(tempDataSyncS$HUC8))
 Ti <- length(unique(tempDataSyncS$year))
 
+```
+
+
+```{r make predictions}
+library(rjags)
+ar1.mat <- as.matrix(M.ar1)
+ar1.mat2 <- apply(ar1.mat, 2, mean)
+
+extractCoef <- function (means.mat, data, family.name, groupIDs = NULL, rand.spec = FALSE) {
+  require(dplyr)
+  name.vect <- as.character(names(means.mat))
+  df <- data.frame(Parameter = name.vect, Mean = means.mat)
+  B <- dplyr::filter(df, grepl(family.name, Parameter))
+  B$Parameter <- as.character(B$Parameter)
+  K <- dim(data)[2]
+  if(rand.spec) {
+    M <- length(groupIDs)
+    Parameter <- NULL
+    #Parameter <- matrix(NA, M, K)
+    foo <- list()
+    for(m in 1:M) {
+      for(k in 1:K) {
+        Parameter[k] <- paste0(family.name,'[',m,',',k,']')
+        }
+      temp <- data.frame(param.names = names(data), Parameter, Order = seq(1, ncol(data)))
+      temp$Parameter <- as.character(temp$Parameter)
+      temp <- left_join(temp, B, by = "Parameter")
+      temp.name <- paste0(groupIDs[m])
+      foo[[temp.name]] <- temp
+      }
+    } else {
+      Parameter <- NULL
+      foo <- NULL
+      for(k in 1:K) {
+        Parameter[k] <- paste0(family.name,'[',k,']')
+        }
+      foo <- data.frame(param.names = names(data), Parameter, Order = seq(1, ncol(data)))
+      foo$Parameter <- as(foo$Parameter, "character")
+      #coef.avg <- avgCoefs(ggs.obj = ggs.obj)
+      foo <- arrange(left_join(foo, B, by = "Parameter"), Order)
+      }
+  
+  return(foo)
+  }
+
+B.fixed <- extractCoef(ar1.mat2, data.fixed, "B.0")
+
+hucs <- unique(tempDataSyncS$HUC8)
+B.huc <- extractCoef(means.mat = ar1.mat2, data = data.random.sites, family.name = "B.huc", groupIDs = hucs, rand.spec = TRUE)
+
+sites <- unique(tempDataSyncS$site)
+B.site <- extractCoef(ar1.mat2, data.random.sites, "B.site", groupIDs = sites, rand.spec = TRUE)
+
+years <- as.character(unique(tempDataSyncS$year))
+B.year <- extractCoef(ar1.mat2, data.random.years, "B.year", groupIDs = years, rand.spec = TRUE)
+
+# Then Predict:
+system.time(for(i in 1:dim(data.fixed)[1]) {
+  tempDataSync$Pred[i] <- as.numeric(B.fixed$Mean %*% t(data.fixed[i, ]) + B.huc[[tempDataSyncS$HUC8[i]]]$Mean %*% t(data.random.sites[i, ]) + B.site[[tempDataSyncS$site[i]]]$Mean %*% t(data.random.sites[i, ]) + B.year[[as.character(tempDataSyncS$year[i])]]$Mean %*% t(data.random.years[i, ])) # add the autoregressive
+  
+  ############ Check order of years!!!!! ##############
+  }) # SLOW (40s for just obseved MA sites and days) - but not sure how to do this without for loop and maintaining matrix multiplication like in JAGS - hard to vectorize with nested random effects
+
+ggplot(tempDataSync, aes(temp, Pred)) + geom_point() # not working, the order could be messed up somewhere
+
+```
+
+
+```{r old approach}
+avgCoefs <- function(ggs.obj) {
+  #detach("package:ggmcmc", unload = TRUE)
+  library(dplyr)
+  means <- ggs.obj %>%
+    group_by(Parameter = Parameter) %>%
+    dplyr::summarise(mean=mean(value), sd=sd(value))
+}
+
+
 # Make "Fixed Effects" Output like summary(lmer)
 #codaFixEf <- function (K.0, K, L, variables.fixed, variables.site, variables.year, k, summary.stats, l) {
   fix.ef <- as.data.frame(matrix(NA, K.0+K+L, 4))

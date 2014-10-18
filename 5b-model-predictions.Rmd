@@ -153,6 +153,8 @@ tempFullSyncS$cYear <- as.character(tempFullSyncS$year)
 
 ```{r}
 
+# if site, huc, or year not in original data ( %in% tempDataSync) use 0 for B.site, B.huc, B.year
+
 
 
 
