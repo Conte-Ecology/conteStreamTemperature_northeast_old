@@ -79,17 +79,23 @@ B.site <- extractCoef(ar1.mat2, data.random.sites, "B.site", groupIDs = sites, r
 years <- as.character(unique(tempDataSyncS$year))
 B.year <- extractCoef(ar1.mat2, data.random.years, "B.year", groupIDs = years, rand.spec = TRUE)
 
-# Then Predict:
+# Then Predict: (still have to add autoregressive)
 system.time(for(i in 1:dim(data.fixed)[1]) {
   tempDataSync$Pred[i] <- as.numeric(B.fixed$Mean %*% t(data.fixed[i, ]) + B.huc[[tempDataSyncS$HUC8[i]]]$Mean %*% t(data.random.sites[i, ]) + B.site[[tempDataSyncS$site[i]]]$Mean %*% t(data.random.sites[i, ]) + B.year[[as.character(tempDataSyncS$year[i])]]$Mean %*% t(data.random.years[i, ])) # add the autoregressive
   
   ############ Check order of years!!!!! ##############
   }) # SLOW (40s for just obseved MA sites and days) - but not sure how to do this without for loop and maintaining matrix multiplication like in JAGS - hard to vectorize with nested random effects
 
+# not working so check order of data
+cbind(tempDataSyncS$airTemp[1:10], data.random.sites$airTemp[1:10])
+
+
 ggplot(tempDataSync, aes(temp, Pred)) + geom_point() # not working, the order could be messed up somewhere
 
 ```
 
+
+# old approach - clunky but basically works
 
 ```{r old approach}
 avgCoefs <- function(ggs.obj) {
