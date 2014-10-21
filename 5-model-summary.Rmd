@@ -13,7 +13,7 @@ load('localData/northeast-mcmc.RData')
 
 # memory.limit(size = 1e6)
 
-system.time(summary.stats <- summary(M.ar1)) # takes a long time for full dataset. look for better solution
+#system.time(summary.stats <- summary(M.ar1)) # takes a long time for full dataset. look for better solution
 
 K.0 <- dim(data.fixed)[2]
 K <- dim(data.random.sites)[2]
@@ -31,7 +31,7 @@ library(rjags)
 ar1.mat <- as.matrix(M.ar1)
 ar1.mat2 <- apply(ar1.mat, 2, mean)
 
-extractCoef <- function (means.mat, data, family.name, groupIDs = NULL, rand.spec = FALSE) {
+extractCoef <- function (means.mat, data = NULL, family.name, groupIDs = NULL, rand.spec = FALSE) {
   require(dplyr)
   name.vect <- as.character(names(means.mat))
   df <- data.frame(Parameter = name.vect, Mean = means.mat)
@@ -44,12 +44,16 @@ extractCoef <- function (means.mat, data, family.name, groupIDs = NULL, rand.spe
     #Parameter <- matrix(NA, M, K)
     foo <- list()
     for(m in 1:M) {
-      for(k in 1:K) {
+      if(is.null(data)) {
+        temp <- B[m, 2]
+      } else {
+        for(k in 1:K) {
         Parameter[k] <- paste0(family.name,'[',m,',',k,']')
         }
       temp <- data.frame(param.names = names(data), Parameter, Order = seq(1, ncol(data)))
       temp$Parameter <- as.character(temp$Parameter)
       temp <- left_join(temp, B, by = "Parameter")
+      }
       temp.name <- paste0(groupIDs[m])
       foo[[temp.name]] <- temp
       }
@@ -68,7 +72,7 @@ extractCoef <- function (means.mat, data, family.name, groupIDs = NULL, rand.spe
   return(foo)
   }
 
-B.fixed <- extractCoef(ar1.mat2, data.fixed, "B.0")
+B.fixed <- extractCoef(means.mat = ar1.mat2, data = data.fixed, family.name = "B.0")
 
 hucs <- unique(tempDataSyncS$HUC8)
 B.huc <- extractCoef(means.mat = ar1.mat2, data = data.random.sites, family.name = "B.huc", groupIDs = hucs, rand.spec = TRUE)
@@ -76,21 +80,52 @@ B.huc <- extractCoef(means.mat = ar1.mat2, data = data.random.sites, family.name
 sites <- unique(tempDataSyncS$site)
 B.site <- extractCoef(ar1.mat2, data.random.sites, "B.site", groupIDs = sites, rand.spec = TRUE)
 
+B.ar1 <- extractCoef(ar1.mat2, data = NULL, "B.ar1", groupIDs = sites, rand.spec = TRUE)
+
 years <- as.character(unique(tempDataSyncS$year))
 B.year <- extractCoef(ar1.mat2, data.random.years, "B.year", groupIDs = years, rand.spec = TRUE)
 
-# Then Predict: (still have to add autoregressive)
-system.time(for(i in 1:dim(data.fixed)[1]) {
-  tempDataSync$Pred[i] <- as.numeric(B.fixed$Mean %*% t(data.fixed[i, ]) + B.huc[[tempDataSyncS$HUC8[i]]]$Mean %*% t(data.random.sites[i, ]) + B.site[[tempDataSyncS$site[i]]]$Mean %*% t(data.random.sites[i, ]) + B.year[[as.character(tempDataSyncS$year[i])]]$Mean %*% t(data.random.years[i, ])) # add the autoregressive
-  
-  ############ Check order of years!!!!! ##############
-  }) # SLOW (40s for just obseved MA sites and days) - but not sure how to do this without for loop and maintaining matrix multiplication like in JAGS - hard to vectorize with nested random effects
+# Then Predict:
 
-# not working so check order of data
-cbind(tempDataSyncS$airTemp[1:10], data.random.sites$airTemp[1:10])
+tempDataSyncS$Pred <- NA
+for(i in 1:length(firstObsRows$rowNum)) {
+  tempDataSyncS$Pred[firstObsRows$rowNum[i]] <- as.numeric(
+    B.fixed$Mean %*% t(data.fixed[firstObsRows$rowNum[i], ]) + 
+      B.huc[[tempDataSyncS$HUC8[firstObsRows$rowNum[i]]]]$Mean %*% t(data.random.sites[firstObsRows$rowNum[i], ]) + 
+      B.site[[tempDataSyncS$site[firstObsRows$rowNum[i]]]]$Mean %*% t(data.random.sites[firstObsRows$rowNum[i], ]) + 
+      B.year[[as.character(tempDataSyncS$year[firstObsRows$rowNum[i]])]]$Mean %*% t(data.random.years[firstObsRows$rowNum[i], ]))
+  }
+for(i in 1:length(evalRows$rowNum)) {
+  tempDataSyncS$Pred[evalRows$rowNum[i]] <- as.numeric(
+    B.fixed$Mean %*% t(data.fixed[evalRows$rowNum[i], ]) + 
+      B.huc[[tempDataSyncS$HUC8[evalRows$rowNum[i]]]]$Mean %*% t(data.random.sites[evalRows$rowNum[i], ]) + 
+      B.site[[tempDataSyncS$site[evalRows$rowNum[i]]]]$Mean %*% t(data.random.sites[evalRows$rowNum[i], ]) + 
+      B.year[[as.character(tempDataSyncS$year[evalRows$rowNum[i]])]]$Mean %*% t(data.random.years[evalRows$rowNum[i], ]) + 
+      as.numeric(B.ar1[tempDataSyncS$site[evalRows$rowNum[i]]]) * (tempDataSyncS$temp[evalRows$rowNum[i]-1] - tempDataSyncS$Pred[evalRows$rowNum[i]-1]))
+  }
+############ Check order of years!!!!! ##############
+# SLOW (40s for just obseved MA sites and days) - but not sure how to do this without for loop and maintaining matrix multiplication like in JAGS - hard to vectorize with nested random effects
+
+library(ggplot2)
+ggplot(tempDataSyncS, aes(temp, Pred)) + geom_point() + geom_abline(aes(1,1), colour = 'blue')
 
 
-ggplot(tempDataSync, aes(temp, Pred)) + geom_point() # not working, the order could be messed up somewhere
+tempDataSyncS$resid.ar1 <- NA
+for(i in 1:length(tempDataSyncS$temp)) {
+  tempDataSyncS$resid.ar1[i] <- mean(ar1.mat[ , paste0("residuals[", i, "]")])
+  #tempDataSyncS$resid.ar1[i] <- ar1.mat[ , paste0("residuals[", i, "]")][1]
+  }
+
+tempDataSyncS$resid.r <- tempDataSyncS$temp - tempDataSyncS$Pred
+
+rmse(tempDataSyncS$resid.r)
+rmse(tempDataSyncS$resid.ar1)
+
+tempDataSyncS$Pred.jags <- tempDataSyncS$temp - tempDataSyncS$resid.ar1
+
+summary(tempDataSyncS)
+
+ggplot(tempDataSyncS, aes(Pred.jags, Pred)) + geom_point()
 
 ```
 

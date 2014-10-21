@@ -125,7 +125,7 @@ monitor.params <- c("residuals",
             "sigma.b.year")
 
 coda.tf <- T # currently only works in full for TRUE (using coda.samples)
-system.time(M.ar1 <- modelRegionalTempAR1(tempDataSyncS, data.fixed=data.fixed, data.random.sites=data.random.sites, data.random.years=data.random.years, deployments = deploy.vect, n.burn = 500, n.it = 500, n.thin = 1, nc = 3, coda = coda.tf, param.list = monitor.params)) # Slow with AR1: ~3-6 min per 100 iterations (13 min per 100 iter for site AR)
+system.time(M.ar1 <- modelRegionalTempAR1(tempDataSyncS, data.fixed=data.fixed, data.random.sites=data.random.sites, data.random.years=data.random.years, firstObsRows = firstObsRows, evalRows = evalRows, n.burn = 1000, n.it = 1000, n.thin = 1, nc = 3, coda = coda.tf, param.list = monitor.params)) # Slow with AR1: ~3-6 min per 100 iterations (13 min per 100 iter for site AR)
 
 save(M.ar1, file = paste0(dataLocalDir, "northeast-mcmc.RData"))
 
@@ -171,11 +171,6 @@ ggmcmc(ggs.ar1.rho.huc, file = 'localData/ggmcmc-ar1-rho-huc.pdf', family = "rho
 ggs.ar1.B.ar1 <- ggs(M.ar1, family = "B.ar1")
 ggmcmc(ggs.ar1.B.ar1, file = 'localData/ggmcmc-ar1-B-ar1.pdf', family = "B.ar1", plot = c("ggs_traceplot", "ggs_compare_partial", "ggs_autocorrelation"))
 
-ar1.mat <- as.matrix(M.ar1)
-tempDataSyncS$resid.ar1 <- NA
-for(i in 1:length(tempDataSyncS$temp)) {
-  tempDataSyncS$resid.ar1[i] <- mean(ar1.mat[ , paste0("residuals[", i, "]")])
-  }
 ```
 
 
@@ -255,7 +250,7 @@ for(i in 1:length(tempDataSyncS$temp)) {
 ```{r check model fit}
 #------ Check residual patterns------
 # Observed vs Residuals
-#g <- ggplot(tempDataSyncS, aes(temp, resid.ar1)) 
+g <- ggplot(tempDataSyncS, aes(temp, resid.ar1)) 
 #g + geom_point(alpha = 0.3) + geom_smooth() + theme_bw()
 
 library(hexbin)

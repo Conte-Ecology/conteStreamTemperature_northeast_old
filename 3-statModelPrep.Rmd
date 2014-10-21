@@ -207,31 +207,45 @@ tempDataSyncValidS$fsite <- as.factor(tempDataSyncValidS$site)
 
 ```{r}
 # sort by site, year, date
-tbl_df(tempDataSync)
-tempDataSync <- arrange(tempDataSync, HUC8, site, date)
+tbl_df(tempDataSyncS)
+tempDataSyncS <- arrange(tempDataSyncS, HUC8, site, date)
 
 # Within each site, if column above doesn't equal date + 1 then start new deployment ID
 # SLOW - consider rewriting or moving to C++
-tempDataSync$deployID <- NA
-tempDataSync$deployID[1] <- 1
-for(i in 2:nrow(tempDataSync)) {
-  if(tempDataSync$site[i] == tempDataSync$site[i-1] & 
-       tempDataSync$date[i] == tempDataSync$date[i -1] + 1) {
-    tempDataSync$deployID[i] <- tempDataSync$deployID[i-1]
+tempDataSyncS$deployID <- NA
+tempDataSyncS$deployID[1] <- 1
+for(i in 2:nrow(tempDataSyncS)) {
+  if(tempDataSyncS$site[i] == tempDataSyncS$site[i-1] & 
+       tempDataSyncS$date[i] == tempDataSyncS$date[i -1] + 1) {
+    tempDataSyncS$deployID[i] <- tempDataSyncS$deployID[i-1]
     } else {
-      tempDataSync$deployID[i] <- tempDataSync$deployID[i-1] + 1
+      tempDataSyncS$deployID[i] <- tempDataSyncS$deployID[i-1] + 1
       }
-  }
+  } # rewrite by shifting one df down by one and comparing if equal
 
-head(tempDataSync, 100)
-summary(tempDataSync)
+head(tempDataSyncS, 100)
+summary(tempDataSyncS)
 
 ```
 
 Need to make a vector to cycle through for doing the autoregressive for each unique deployment
 
+```{r}
+tempDataSyncS$rowNum <- 1:dim(tempDataSyncS)[1]
+
+firstObsRows <- tempDataSyncS %>%
+                  group_by(deployID) %>%
+                  filter(date == min(date))%>%
+                  select(rowNum)
+
+evalRows <- tempDataSyncS %>%
+                  group_by(deployID) %>%
+                  filter(date != min(date))%>%
+                  select(rowNum)
+```
+
 ```{r make AR vector}
-deploy.length <- table(tempDataSync$deployID) # named vector, length of each deployment (never longer than the syncronized season)
+deploy.length <- table(tempDataSyncS$deployID) # named vector, length of each deployment (never longer than the syncronized season)
 
 deploy.cumsum <- cumsum(deploy.length)
 
@@ -243,7 +257,7 @@ deploy.vect <- c(0, deploy.cumsum) + 1
 
 ```{r save tempDataSync for use in analysis}
 
-save(tempDataSync, tempDataSyncS, tempDataSyncValid, tempDataSyncValidS, deploy.vect, file=paste0(dataOutDir, 'tempDataSync.RData'))
+save(tempDataSync, tempDataSyncS, tempDataSyncValid, tempDataSyncValidS, firstObsRows, evalRows, file=paste0(dataOutDir, 'tempDataSync.RData'))
 
 ```
 
