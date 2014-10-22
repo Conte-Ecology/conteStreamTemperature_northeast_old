@@ -78,6 +78,8 @@ dev.off()
 ######
 # rename all variables before setting the fixed and random, then select them by list
 ####
+
+## Change to use model matrix for simplicity and consistency
 data.fixed <- data.frame(intercept = 1,
                     lat = tempDataSyncS$Latitude,
                     lon = tempDataSyncS$Longitude,
@@ -108,8 +110,8 @@ monitor.params <- c("residuals",
             "deviance",
             "sigma",
             "B.ar1",
-            "mu.ar1",
-            "sigma.ar1",
+            #"mu.ar1",
+            #"sigma.ar1",
             "B.0",
             "B.site",
             "rho.B.site",
