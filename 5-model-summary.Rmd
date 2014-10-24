@@ -5,6 +5,151 @@ date: "August 28, 2014"
 output: html_document
 ---
 
+
+```{r test}
+
+gc()
+
+library(rjags)
+#ar1.mat <- as.matrix(M.ar1)
+#ar1.mat2 <- apply(ar1.mat, 2, mean)
+
+#B.fixed <- extractCoef(means.mat = ar1.mat2, data = data.fixed, family.name = "B.0")
+
+#years <- as.character(unique(tempDataSyncS$year))
+#B.year <- extractCoef(ar1.mat2, data.random.years, "B.year", groupIDs = years, rand.spec = TRUE)
+
+
+#B.year.ggs <- ggs(M.ar1, family = "B.year")
+#str(B.year.ggs)
+
+avgCoefs <- function(ggs.obj, family = NULL) {
+  #detach("package:ggmcmc", unload = TRUE)
+  require(dplyr)
+  if(class(family) == "character") {
+    means <- ggs.obj %>%
+      group_by(Parameter = Parameter) %>%
+      filter(grepl(paste0('^', family), Parameter)) %>%
+      dplyr::summarise(mean=mean(value), sd=sd(value), qLo=quantile(value,probs=c(0.025)),qHi=quantile(value,probs=c(0.975)))
+    } else {
+      means <- ggs.obj %>%
+        group_by(Parameter = Parameter) %>%
+        dplyr::summarise(mean=mean(value), sd=sd(value), qLo=quantile(value,probs=c(0.025)),qHi=quantile(value,probs=c(0.975)))
+      }
+  return(means)
+  }
+
+
+system.time(coef.summary.B0 <- avgCoefs(ggs.ar1, family = "B.0")) # 48s
+
+# Get the mean parameter estimates
+#foo <- avgCoefs.ggs(B.year.ggs)#[1:64, ]
+B.fixed <- dplyr::filter(coef.summary, grepl('^B.0', coef.summary$Parameter))
+#B.ar1 <- dplyr::filter(coef.summary, grepl('^B.ar1', coef.summary$Parameter))
+
+#B.year.mean <- filter(coef.summary, grepl('^B.year', coef.summary$Parameter))
+
+#B.year.mean$index <- as.numeric(sub(".*?([0-9]+),([0-9]).", replacement = "\\1", B.year.mean$Parameter))
+#B.year.mean$index2 <- as.numeric(sub(".*?([0-9]+),([0-9]).", replacement = "\\2", B.year.mean$Parameter))
+
+#df.year <- data.frame(year = levels(as.factor(tempDataSyncS$year)), index = 1:length(unique(tempDataSyncS$year)))
+#df.coef <- data.frame(coef = colnames(data.random.years), index2 = 1:length(colnames(data.random.years)))
+
+# recombine to link year and index number of the year
+#B.year.mean <- dplyr::left_join(B.year.mean, df.year, by = "index")
+#B.year.mean <- dplyr::left_join(B.year.mean, df.coef, by = "index2")
+
+
+
+nameCoefs <- function (coef.summary, rand.levels, family, param.names = NULL) {
+  if(class(param.names) == "character") {
+    B.mean <- filter(coef.summary, grepl(paste0('^B.',family), coef.summary$Parameter))
+    
+    B.mean$index <- as.numeric(sub(".*?([0-9]+),([0-9]).", replacement = "\\1", B.mean$Parameter))
+    B.mean$index2 <- as.numeric(sub(".*?([0-9]+),([0-9]).", replacement = "\\2", B.mean$Parameter))
+    
+    df <- data.frame(rand.levels, index = 1:length(rand.levels))
+    names(df) <- c(family, "index")
+    df.coef <- data.frame(coef = param.names, index2 = 1:length(param.names))
+    
+    # recombine to link year and index number of the year
+    B.mean <- dplyr::left_join(B.mean, df, by = "index")
+    B.mean <- dplyr::left_join(B.mean, df.coef, by = "index2")
+    } else {
+      B.mean <- filter(coef.summary, grepl(paste0('^B.',family), coef.summary$Parameter))
+      
+      B.mean$index <- as.numeric(sub(".*?([0-9]+).", replacement = "\\1", B.mean$Parameter))
+      
+      df <- data.frame(rand.levels, index = 1:length(rand.levels))
+      names(df) <- c(family, "index")
+      
+      # recombine to link year and index number of the year
+      B.mean <- dplyr::left_join(B.mean, df, by = "index")
+      }
+  
+  return(B.mean)
+  }
+
+B.ar1 <- nameCoefs(coef.summary = coef.summary, rand.levels = levels(as.factor(tempDataSyncS$site)), family = "ar1")
+names(B.ar1) <- c("Parameter", "mean", "sd", "qLo", "qHi", "index", "site")
+
+B.year <- nameCoefs(coef.summary = coef.summary, rand.levels = levels(as.factor(tempDataSyncS$year)), param.names = colnames(data.random.years), family = "year")
+
+B.site <- nameCoefs(coef.summary = coef.summary, rand.levels = levels(as.factor(tempDataSyncS$site)), param.names = colnames(data.random.sites), family = "site")
+
+B.huc <- nameCoefs(coef.summary = coef.summary, rand.levels = levels(as.factor(tempDataSyncS$HUC8)), param.names = colnames(data.random.sites), family = "huc")
+
+
+# Alternative: indexing based on the order found in the df but index sorted by character
+# B.year.mean <- data.frame(B.year.mean, year = rep(unique(as.factor(tempDataSyncS$year)), each = 4))
+
+# Alternative: indexing based on numeric sorted year
+#B.year.mean$index <- as.numeric(sub(".*?([0-9]+),[0-9].", replacement = "\\1", B.year.mean$Parameter))
+#B.year.mean <- arrange(B.year.mean, index)
+#B.year.mean <- data.frame(B.year.mean, year = rep(min(tempDataSyncS$year):max(tempDataSyncS$year), each = 4)) # WORKS!!!!!!!!!!!!!!!
+
+# Then Predict:
+tempDataSyncS$Pred <- NA
+for(i in 1:length(firstObsRows$rowNum)) {
+  tempDataSyncS$Pred[firstObsRows$rowNum[i]] <- as.numeric(
+    B.fixed$mean %*% t(data.fixed[firstObsRows$rowNum[i], ]) + 
+      filter(B.huc, huc == as.character(tempDataSyncS$HUC8[firstObsRows$rowNum[i]]))$mean %*% t(data.random.sites[firstObsRows$rowNum[i], ]) + 
+      filter(B.site, site == as.character(tempDataSyncS$site[firstObsRows$rowNum[i]]))$mean %*% t(data.random.sites[firstObsRows$rowNum[i], ]) + 
+      filter(B.year, year == as.character(tempDataSyncS$year[firstObsRows$rowNum[i]]))$mean %*% t(data.random.years[firstObsRows$rowNum[i], ])
+    )
+  }
+for(i in 1:length(evalRows$rowNum)) {
+  tempDataSyncS$Pred[evalRows$rowNum[i]] <- as.numeric(
+    B.fixed$mean %*% t(data.fixed[evalRows$rowNum[i], ]) + 
+      filter(B.huc, huc == as.character(tempDataSyncS$HUC8[evalRows$rowNum[i]]))$mean %*% t(data.random.sites[evalRows$rowNum[i], ]) + 
+      filter(B.site, site == as.character(tempDataSyncS$site[evalRows$rowNum[i]]))$mean %*% t(data.random.sites[evalRows$rowNum[i], ]) + 
+      filter(B.year, year == as.character(tempDataSyncS$year[evalRows$rowNum[i]]))$mean %*% t(data.random.years[evalRows$rowNum[i], ]) + 
+      #B.ar1 * (tempDataSyncS$temp[evalRows$rowNum[i]-1] - tempDataSyncS$Pred[evalRows$rowNum[i]-1]))
+      filter(B.ar1, site == as.character(tempDataSyncS$site[evalRows$rowNum[i]]))$mean * (tempDataSyncS$temp[evalRows$rowNum[i]-1] - tempDataSyncS$Pred[evalRows$rowNum[i]-1])
+    )
+  }
+############ Check order of years!!!!! ##############
+# SLOW (40s for just obseved MA sites and days) - but not sure how to do this without for loop and maintaining matrix multiplication like in JAGS - hard to vectorize with nested random effects
+
+library(ggplot2)
+ggplot(tempDataSyncS, aes(temp, Pred)) + geom_point() + geom_abline(aes(1,1), colour = 'blue')
+
+tempDataSyncS$resid.r <- tempDataSyncS$temp - tempDataSyncS$Pred
+
+rmse(tempDataSyncS$resid.r)
+rmse(tempDataSyncS$resid.ar1)
+
+tempDataSyncS$Pred.jags <- tempDataSyncS$temp - tempDataSyncS$resid.ar1
+
+summary(tempDataSyncS)
+
+ggplot(tempDataSyncS, aes(Pred.jags, Pred)) + geom_point()
+
+
+
+```
+
+
 ```{r}
 library(rjags)
 # need to load data.fixed, data.random.sites, data.random.years
@@ -72,20 +217,60 @@ extractCoef <- function (means.mat, data = NULL, family.name, groupIDs = NULL, r
   return(foo)
   }
 
-B.fixed <- extractCoef(means.mat = ar1.mat2, data = data.fixed, family.name = "B.0")
+extractCoef <- function (means.mat, family.name, param.names = NULL, group.ID = NULL, rand.spec = FALSE) {
+  require(dplyr)
+  name.vect <- as.character(names(means.mat))
+  df <- data.frame(Parameter = name.vect, Mean = means.mat)
+  B <- dplyr::filter(df, grepl(paste0("^",family.name), Parameter))
+  B$Parameter <- as.character(B$Parameter)
+  K <- length(param.names)
+  if(rand.spec) {
+    M <- length(group.ID)
+    Parameter <- NULL
+    #Parameter <- matrix(NA, M, K)
+    foo <- list()
+    for(m in 1:M) {
+      if(is.null(param.names)) {
+        temp <- B[m, 2]
+      } else {
+        for(k in 1:K) {
+        Parameter[k] <- paste0(family.name,'[',m,',',k,']')
+        }
+      temp <- data.frame(param.names = param.names, Parameter, Order = seq(1, length(param.names)))
+      temp$Parameter <- as.character(temp$Parameter)
+      temp <- left_join(temp, B, by = "Parameter")
+      }
+      temp.name <- paste0(group.ID[m])
+      foo[[temp.name]] <- temp
+      }
+    } else {
+      Parameter <- NULL
+      foo <- NULL
+      for(k in 1:K) {
+        Parameter[k] <- paste0(family.name,'[',k,']')
+        }
+      foo <- data.frame(param.names = param.names, Parameter, Order = seq(1, length(param.names)))
+      foo$Parameter <- as(foo$Parameter, "character")
+      #coef.avg <- avgCoefs(ggs.obj = ggs.obj)
+      foo <- arrange(left_join(foo, B, by = "Parameter"), Order)
+      }
+  
+  return(foo)
+  }
 
-hucs <- unique(tempDataSyncS$HUC8)
-B.huc <- extractCoef(means.mat = ar1.mat2, data = data.random.sites, family.name = "B.huc", groupIDs = hucs, rand.spec = TRUE)
+B.fixed <- extractCoef(means.mat = ar1.mat2, param.names = colnames(data.fixed), family.name = "B.0")
 
-sites <- unique(tempDataSyncS$site)
-B.site <- extractCoef(ar1.mat2, data.random.sites, "B.site", groupIDs = sites, rand.spec = TRUE)
+hucs <- levels(tempDataSyncS$HUC8)
+B.huc <- extractCoef(means.mat = ar1.mat2, family.name = "B.huc", param.names = colnames(data.random.sites), group.ID = hucs, rand.spec = TRUE)
+
+sites <- levels(tempDataSyncS$site)
+B.site <- extractCoef(ar1.mat2, "B.site", colnames(data.random.sites), group.ID = sites, rand.spec = TRUE)
 
  B.ar1 <- extractCoef(ar1.mat2, data = NULL, "B.ar1", groupIDs = sites, rand.spec = TRUE)
 #B.ar1 <- ar1.mat2["B.ar1"]
 
-years <- as.character(unique(tempDataSyncS$year))
+years <- levels(tempDataSyncS$year))
 B.year <- extractCoef(ar1.mat2, data.random.years, "B.year", groupIDs = years, rand.spec = TRUE)
-
 
 
 # Then Predict:

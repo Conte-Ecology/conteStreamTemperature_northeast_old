@@ -5,7 +5,7 @@ date: "August 28, 2014"
 output: html_document
 ---
 
-```{r results = 'hide', }
+```{r results = 'hide'}
 #rm(list=ls())
 
 library(knitr)
@@ -50,36 +50,12 @@ load(paste0(dataOutDir, 'tempDataSync.RData'))
 print(getwd())
 ```
 
-
-```{r run-model, results = 'hide'}
-########## JAGS Model ##############
-coda.tf <- T # currently only works in full for TRUE (using coda.samples)
-M3 <- modelRegionalTemp(tempDataSyncS, n.burn = 1000, n.it = 1000, n.thin = 1, n.chains = 3, coda = coda.tf, param.list = c("sigma",
-            "B.0",
-            #"B.site",
-            #"rho.B.site",
-            "mu.site",
-            "sigma.b.site",
-            #"B.huc",
-            #"rho.B.huc",
-            #"B.year",
-            #"rho.B.year",
-            "mu.year",
-            "sigma.b.year"))
-
-save(M3, file = paste0(dataLocalDir, "northeast-mcmc.RData"))
-
-pdf("test.pdf")
-plot(M3)
-dev.off()
-```
-
-```{r test site within HUC model with residual AR1}
+```{r site within HUC model with residual AR1}
 ######
-# rename all variables before setting the fixed and random, then select them by list
+# rename all variables before setting the fixed and random, then select them by list?
 ####
 
-## Change to use model matrix for simplicity and consistency
+## Change to use model matrix for simplicity and consistency?
 data.fixed <- data.frame(intercept = 1,
                     lat = tempDataSyncS$Latitude,
                     lon = tempDataSyncS$Longitude,
@@ -90,6 +66,13 @@ data.fixed <- data.frame(intercept = 1,
                     wetland = tempDataSyncS$CONUSWetland,
                     impoundments = tempDataSyncS$ImpoundmentsAllSqKM,
                     airT.drainage = tempDataSyncS$airTemp * tempDataSyncS$TotDASqKM)
+
+# Benefit of using model matrix?
+# fixed.form <- formula( ~ 1 + Latitude + Longitude + airTemp * TotDASqKM)
+# data.fixed <- model.matrix(fixed.form, tempDataSyncS)
+# str(data.fixed)
+# head(data.fixed)
+# colnames(data.fixed)
 
 data.random.sites <- data.frame(intercept.site = 1, 
                      airTemp = tempDataSyncS$airTemp, 
@@ -110,8 +93,8 @@ monitor.params <- c("residuals",
             "deviance",
             "sigma",
             "B.ar1",
-            #"mu.ar1",
-            #"sigma.ar1",
+            "mu.ar1",
+            "sigma.ar1",
             "B.0",
             "B.site",
             "rho.B.site",
@@ -127,7 +110,7 @@ monitor.params <- c("residuals",
             "sigma.b.year")
 
 coda.tf <- T # currently only works in full for TRUE (using coda.samples)
-system.time(M.ar1 <- modelRegionalTempAR1(tempDataSyncS, data.fixed=data.fixed, data.random.sites=data.random.sites, data.random.years=data.random.years, firstObsRows = firstObsRows, evalRows = evalRows, n.burn = 1000, n.it = 1000, n.thin = 1, nc = 3, coda = coda.tf, param.list = monitor.params)) # Slow with AR1: ~3-6 min per 100 iterations (13 min per 100 iter for site AR)
+system.time(M.ar1 <- modelRegionalTempAR1(tempDataSyncS, data.fixed=data.fixed, data.random.sites=data.random.sites, data.random.years=data.random.years, firstObsRows = firstObsRows, evalRows = evalRows, n.burn = 100, n.it = 1000, n.thin = 1, nc = 3, coda = coda.tf, param.list = monitor.params)) # Slow with AR1: ~3-6 min per 100 iterations (13 min per 100 iter for site AR)
 
 save(M.ar1, file = paste0(dataLocalDir, "northeast-mcmc.RData"))
 
@@ -137,122 +120,50 @@ save(M.ar1, file = paste0(dataLocalDir, "northeast-mcmc.RData"))
 ```
 
 ## Evaluate MCMC Iterations
+
 ```{r check model convergence and mixing}
-#ggs.ar1 <- ggs(M.ar1) # slow and memory intensive
+system.time(ggs.ar1 <- ggs(M.ar1)) # slow and memory intensive - 2 minutes with residuals saved in mcmc object and no other programs running but uses most of the memory on my 8 GB laptop
+gc() # clears all of the temporary variables stored by ggs and cuts hanging memory more than in half.
 
 #ggmcmc(ggs.ar1, file = "ggmcmc-ar1.pdf", family = "mu.huc", plot = c("ggs_density",  "ggs_traceplot", "ggs_running", "ggs_compare_partial", "ggs_autocorrelation", "ggs_crosscorrelation", "ggs_Rhat", "ggs_geweke", "ggs_caterpillar"))
 #dev.off()
 
-ggs.ar1.B.0 <- ggs(M.ar1, family = "B.0")
-ggs_traceplot(ggs.ar1.B.0, family = "B.0")
+ggs_traceplot(ggs.ar1, family = "B.0")
 
-ggs.ar1.mu.huc <- ggs(M.ar1, family = "mu.huc")
-ggs_traceplot(ggs.ar1.mu.huc, family = "mu.huc")
+ggs_traceplot(ggs.ar1, family = "mu.huc")
 
-ggs.ar1.mu.year <- ggs(M.ar1, family = "mu.year")
-ggs_traceplot(ggs.ar1.mu.year, family = "mu.year")
+ggs_traceplot(ggs.ar1, family = "mu.year")
 
-ggs.ar1.mu.ar1 <- ggs(M.ar1, family = "mu.ar1")
-ggs_traceplot(ggs.ar1.mu.ar1, family = "mu.ar1")
+ggs_traceplot(ggs.ar1, family = "mu.ar1")
 
-ggs.ar1.sigma.ar1 <- ggs(M.ar1, family = "sigma.ar1")
-ggs_traceplot(ggs.ar1.sigma.ar1, family = "sigma.ar1")
+ggs_traceplot(ggs.ar1, family = "sigma.ar1")
 
-ggs.ar1.sigma.b.site <- ggs(M.ar1, family = "sigma.b.site")
-ggs_traceplot(ggs.ar1.sigma.b.site, family = "sigma.b.site")
+ggs_traceplot(ggs.ar1, family = "sigma.b.site")
 
-ggs.ar1.sigma.b.huc <- ggs(M.ar1, family = "sigma.b.huc")
-ggs_traceplot(ggs.ar1.sigma.b.huc, family = "sigma.b.huc")
+ggs_traceplot(ggs.ar1, family = "sigma.b.huc")
 
-ggs.ar1.sigma.b.year <- ggs(M.ar1, family = "sigma.b.year")
-ggs_traceplot(ggs.ar1.sigma.b.year, family = "sigma.b.year")
+ggs_traceplot(ggs.ar1, family = "sigma.b.year")
 
-ggs.ar1.rho.huc <- ggs(M.ar1, family = "rho.B.huc")
-ggmcmc(ggs.ar1.rho.huc, file = 'localData/ggmcmc-ar1-rho-huc.pdf', family = "rho.B.huc", plot = "ggs_traceplot")
+ggmcmc(ggs.ar1, file = 'localData/ggmcmc-ar1-rho-huc.pdf', family = "rho.B.huc", plot = "ggs_traceplot")
 
-ggs.ar1.B.ar1 <- ggs(M.ar1, family = "B.ar1")
-ggmcmc(ggs.ar1.B.ar1, file = 'localData/ggmcmc-ar1-B-ar1.pdf', family = "B.ar1", plot = c("ggs_traceplot", "ggs_compare_partial", "ggs_autocorrelation"))
+ggmcmc(ggs.ar1, file = 'localData/ggmcmc-ar1-B-ar1.pdf', family = "B.ar1", plot = c("ggs_traceplot", "ggs_compare_partial", "ggs_autocorrelation"))
 
 ```
 
-
-
-
-```{r test site within HUC model}
-######
-# rename all variables before setting the fixed and random, then select them by list
-####
-data.fixed <- data.frame(intercept = 1,
-                    lat = tempDataSyncS$Latitude,
-                    lon = tempDataSyncS$Longitude,
-                    drainage = tempDataSyncS$TotDASqKM,
-                    forest = tempDataSyncS$Forest,
-                    elevation = tempDataSyncS$ReachElevationM,
-                    coarseness = tempDataSyncS$SurficialCoarseC,
-                    wetland = tempDataSyncS$CONUSWetland,
-                    impoundments = tempDataSyncS$ImpoundmentsAllSqKM)
-
-data.random.sites <- data.frame(intercept.site = 1, 
-                     airTemp = tempDataSyncS$airTemp, 
-                     #airTempLag1 = tempDataSyncS$airTempLagged1,
-                     airTempLag2 = tempDataSyncS$airTempLagged2,
-                     precip = tempDataSyncS$prcp,
-                     precipLag1 = tempDataSyncS$prcpLagged1,
-                     precipLag2 = tempDataSyncS$prcpLagged2) # , swe = tempDataSyncS$swe
-
-data.random.years <- data.frame(intercept.year = 1, 
-                     dOY = tempDataSyncS$dOY, 
-                     dOY2 = tempDataSyncS$dOY^2,
-                     dOY3 = tempDataSyncS$dOY^3)
-
-monitor.params <- c("residuals",
-            "deviance",
-            "sigma",
-            "B.0",
-            "B.site",
-            "rho.B.site",
-            "mu.site",
-            "sigma.b.site",
-            "B.huc",
-            "rho.B.huc",
-            "mu.huc",
-            "sigma.b.huc",
-            "B.year",
-            "rho.B.year",
-            "mu.year",
-            "sigma.b.year")
-
-coda.tf <- T # currently only works in full for TRUE (using coda.samples)
-system.time(M.huc <- modelRegionalTempHUC(tempDataSyncS, data.fixed=data.fixed, data.random.sites=data.random.sites, data.random.years=data.random.years, n.burn = 1000, n.it = 1000, n.thin = 1, nc = 3, coda = coda.tf, param.list = monitor.params))
-
-save(M.huc, file = paste0(dataLocalDir, "northeast-mcmc.RData"))
-
-#pdf("test-huc.pdf")
-#plot(M.huc)
-#dev.off()
-```
 
 ## Evaluate MCMC Iterations
-```{r check model convergence and mixing}
-ggs.huc <- ggs(M.huc)
-ggmcmc(ggs.huc, file = "ggmcmc-huc.pdf", family = "mu.huc", plot = c("ggs_density",  "ggs_traceplot", "ggs_running", "ggs_compare_partial", "ggs_autocorrelation", "ggs_crosscorrelation", "ggs_Rhat", "ggs_geweke", "ggs_caterpillar"))
-dev.off()
 
-ggs_traceplot(ggs.huc, family = "mu.huc")
-
-huc.mat <- as.matrix(M.huc)
-tempDataSyncS$resid.huc <- NA
-for(i in 1:length(tempDataSyncS$temp)) {
-  tempDataSyncS$resid.huc[i] <- mean(huc.mat[ , paste0("residuals[", i, "]")])
-  #  tempDataSyncS$resid.huc[i] <- huc.mat[1 , paste0("residuals[", i, "]")]
-  }
-```
 
 ## Check model fit
+
 ```{r check model fit}
 #------ Check residual patterns------
+
+system.time(coef.summary <- avgCoefs(ggs.ar1)) # 15s
+tempDataSyncS$resid.ar1.2 <- dplyr::filter(coef.summary, grepl('^residuals', coef.summary$Parameter))$mean
+
 # Observed vs Residuals
-g <- ggplot(tempDataSyncS, aes(temp, resid.ar1)) 
+g <- ggplot(data.frame(tempDataSyncS), aes(temp, resid.ar1)) 
 #g + geom_point(alpha = 0.3) + geom_smooth() + theme_bw()
 
 library(hexbin)
@@ -290,64 +201,6 @@ acf(tempDataSyncS$resid.ar1, lag.max = 100, xlab = "Lag", ylab = "Correlation", 
 
 ```
 
-### Check model convergence
-```{r convergence}
-if(coda.tf) {
-  pdf("/Users/Dan/Dropbox/correlatedSlopes.pdf")
-  #pdf("C:/Users/dhocking/Dropbox/correlatedSlopes.pdf")
-  plot(M3[ , 1:200])
-  dev.off()
-  
-  pairs(as.matrix(M3[ , c(1:8, 17:20)]))
-  
-  mcmc.cor <- cor(as.matrix(M3))
-  quantile(mcmc.cor, na.rm = TRUE, probs = c(0.5, 0.9, 0.99, 0.999. 0.9999))
-  
-  gelman.diag(M3[ , 1:99])
-} else {
-  ## deviance
-#[1, 1:200, 3]
-library(reshape2)
-temp2 <- melt(((M3$deviance[,,])))
-temp2 <- melt(((M3$sigma[,,])))
-ggplot(temp2, aes(Var1,(value), colour=factor(Var2) )) +  
-    geom_point(size=1) +
-    scale_x_continuous('Iteration') +
-    scale_y_continuous('Deviance') +
-    ggtitle('desc')
-
-## B.0
-#[1:2, 1:200, 3]
-
-temp2 <- melt(((M3$B.0[,,])))
-temp2 <- melt(((M3$mu.year[,,])))
-temp2 <- melt(((M3$mu.site[,,])))
-temp2 <- melt(((M3$sigma.b.year[,,])))
-temp2 <- melt(((M3$B.year[,,])))
-
-
-ggplot(temp2, aes(Var2,(value), colour=factor(Var3) )) +  
-    geom_point(size=1) +
-    scale_x_continuous('Iteration') +
-    scale_y_continuous('Deviance') +
-    stat_smooth()+
-    facet_grid(~Var1)
-
-
-## B.Site
-#[1:4, 1:4, 1:200, 3]
-
-temp2 <- melt(((M3$B.site[,,,])))
-
-ggplot(temp2[temp2$Var2==1,], aes(Var3,(value), colour=factor(Var4) )) +  
-    geom_point(size=.25) +
-    scale_x_continuous('Iteration') +
-    scale_y_continuous('Deviance') +
-    stat_smooth()+
-    facet_wrap(Var2~Var1)
-}
-
-```
 
 ```{r ending info}
 
