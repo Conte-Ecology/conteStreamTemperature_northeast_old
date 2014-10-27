@@ -5,20 +5,6 @@ date: "August 28, 2014"
 output: html_document
 ---
 
-```{r results = 'hide'}
-#rm(list=ls())
-
-library(knitr)
-#basename <- gsub(".Rmd", "", knitr:::knit_concord$get("infile"))
-#opts_chunk$set(fig.path = paste("figure/", basename, "-", sep = ""), cache.path = paste("cache/", basename, "/", sep = ""))
-#basename <- "testName"
-#opts_chunk$set(cache.path = paste("cache/", basename, "/", sep = ""))
-#opts_chunk$set(cache = 1)
-opts_chunk$set(tidy = FALSE, warning = FALSE, message = FALSE, comment = NA, verbose = TRUE)
-
-```
-
-
 ```{r results = 'hide', warning=FALSE, message=FALSE}
 library(ggplot2)
 library(ggmcmc)
@@ -28,11 +14,6 @@ library(devtools)
 install_github("Conte-Ecology/conteStreamTemperature")
 library(conteStreamTemperature)
 
-#setwd('/Users/Dan/Documents/Research/Stream_Climate_Change/temperatureProject/')
-#setwd('C:/Users/dhocking/Documents/temperatureProject/')
-
-#baseDir <- 'C:/KPONEIL/GitHub/projects/temperatureProject/'
-#baseDir <- "/Users/Dan/Documents/Research/Stream_Climate_Change/conteStreamTemperature_northeast"
 baseDir <- getwd() # works as long as you have the project loaded in RStudio - does not work for kniting
 
 dataInDir <- paste0(baseDir, '/dataIn/')
@@ -68,11 +49,11 @@ data.fixed <- data.frame(intercept = 1,
                     airT.drainage = tempDataSyncS$airTemp * tempDataSyncS$TotDASqKM)
 
 # Benefit of using model matrix?
-# fixed.form <- formula( ~ 1 + Latitude + Longitude + airTemp * TotDASqKM)
-# data.fixed <- model.matrix(fixed.form, tempDataSyncS)
+ fixed.form <- formula( ~ 1 + Latitude + Longitude + airTemp * TotDASqKM)
+ data.fixed <- model.matrix(fixed.form, tempDataSyncS)
 # str(data.fixed)
 # head(data.fixed)
-# colnames(data.fixed)
+ colnames(data.fixed)
 
 data.random.sites <- data.frame(intercept.site = 1, 
                      airTemp = tempDataSyncS$airTemp, 
@@ -90,7 +71,7 @@ data.random.years <- data.frame(intercept.year = 1,
                      dOY3 = tempDataSyncS$dOY^3)
 
 monitor.params <- c("residuals",
-            "deviance",
+            #"deviance",
             "sigma",
             "B.ar1",
             "mu.ar1",
@@ -110,13 +91,10 @@ monitor.params <- c("residuals",
             "sigma.b.year")
 
 coda.tf <- T # currently only works in full for TRUE (using coda.samples)
-system.time(M.ar1 <- modelRegionalTempAR1(tempDataSyncS, data.fixed=data.fixed, data.random.sites=data.random.sites, data.random.years=data.random.years, firstObsRows = firstObsRows, evalRows = evalRows, n.burn = 100, n.it = 1000, n.thin = 1, nc = 3, coda = coda.tf, param.list = monitor.params)) # Slow with AR1: ~3-6 min per 100 iterations (13 min per 100 iter for site AR)
+system.time(M.ar1 <- modelRegionalTempAR1(tempDataSyncS, data.fixed=data.fixed, data.random.sites=data.random.sites, data.random.years=data.random.years, firstObsRows = firstObsRows, evalRows = evalRows, n.burn = 10, n.it = 50, n.thin = 1, nc = 3, coda = coda.tf, param.list = monitor.params)) # Slow with AR1: ~3-6 min per 100 iterations (13 min per 100 iter for site AR)
 
 save(M.ar1, file = paste0(dataLocalDir, "northeast-mcmc.RData"))
 
-#pdf("test-huc.pdf")
-#plot(M.huc)
-#dev.off()
 ```
 
 ## Evaluate MCMC Iterations
@@ -125,8 +103,6 @@ save(M.ar1, file = paste0(dataLocalDir, "northeast-mcmc.RData"))
 system.time(ggs.ar1 <- ggs(M.ar1)) # slow and memory intensive - 2 minutes with residuals saved in mcmc object and no other programs running but uses most of the memory on my 8 GB laptop
 gc() # clears all of the temporary variables stored by ggs and cuts hanging memory more than in half.
 
-#ggmcmc(ggs.ar1, file = "ggmcmc-ar1.pdf", family = "mu.huc", plot = c("ggs_density",  "ggs_traceplot", "ggs_running", "ggs_compare_partial", "ggs_autocorrelation", "ggs_crosscorrelation", "ggs_Rhat", "ggs_geweke", "ggs_caterpillar"))
-#dev.off()
 
 ggs_traceplot(ggs.ar1, family = "B.0")
 
@@ -150,17 +126,13 @@ ggmcmc(ggs.ar1, file = 'localData/ggmcmc-ar1-B-ar1.pdf', family = "B.ar1", plot 
 
 ```
 
-
-## Evaluate MCMC Iterations
-
-
 ## Check model fit
 
 ```{r check model fit}
 #------ Check residual patterns------
 
 system.time(coef.summary <- avgCoefs(ggs.ar1)) # 15s
-tempDataSyncS$resid.ar1.2 <- dplyr::filter(coef.summary, grepl('^residuals', coef.summary$Parameter))$mean
+tempDataSyncS$resid.ar1 <- dplyr::filter(coef.summary, grepl('^residuals', coef.summary$Parameter))$mean
 
 # Observed vs Residuals
 g <- ggplot(data.frame(tempDataSyncS), aes(temp, resid.ar1)) 
@@ -198,6 +170,117 @@ acf(ar1.mat[ , "residuals[2]"], lag.max = 40, xlab = "Lag", ylab = "Correlation"
 
 # correlation in residuals over time 
 acf(tempDataSyncS$resid.ar1, lag.max = 100, xlab = "Lag", ylab = "Correlation", main = "") # not perfect but better than for non-AR model
+
+```
+
+
+```{r test}
+
+gc()
+
+library(rjags)
+
+avgCoefs <- function(ggs.obj, family = NULL) {
+  #detach("package:ggmcmc", unload = TRUE)
+  require(dplyr)
+  if(class(family) == "character") {
+    means <- ggs.obj %>%
+      group_by(Parameter = Parameter) %>%
+      filter(grepl(paste0('^', family), Parameter)) %>%
+      dplyr::summarise(mean=mean(value), sd=sd(value), qLo=quantile(value,probs=c(0.025)),qHi=quantile(value,probs=c(0.975)))
+    } else {
+      means <- ggs.obj %>%
+        group_by(Parameter = Parameter) %>%
+        dplyr::summarise(mean=mean(value), sd=sd(value), qLo=quantile(value,probs=c(0.025)),qHi=quantile(value,probs=c(0.975)))
+      }
+  return(means)
+  }
+
+
+#system.time(coef.summary.B0 <- avgCoefs(ggs.ar1, family = "B.0")) # 48s
+
+B.fixed <- dplyr::filter(coef.summary, grepl('^B.0', coef.summary$Parameter))
+
+nameCoefs <- function (coef.summary, rand.levels, family, param.names = NULL) {
+  if(class(param.names) == "character") {
+    B.mean <- filter(coef.summary, grepl(paste0('^B.',family), coef.summary$Parameter))
+    
+    B.mean$index <- as.numeric(sub(".*?([0-9]+),([0-9]).", replacement = "\\1", B.mean$Parameter))
+    B.mean$index2 <- as.numeric(sub(".*?([0-9]+),([0-9]).", replacement = "\\2", B.mean$Parameter))
+    
+    df <- data.frame(rand.levels, index = 1:length(rand.levels))
+    names(df) <- c(family, "index")
+    df.coef <- data.frame(coef = param.names, index2 = 1:length(param.names))
+    
+    B.mean <- dplyr::left_join(B.mean, df, by = "index")
+    B.mean <- dplyr::left_join(B.mean, df.coef, by = "index2")
+    } else {
+      B.mean <- filter(coef.summary, grepl(paste0('^B.',family), coef.summary$Parameter))
+      
+      B.mean$index <- as.numeric(sub(".*?([0-9]+).", replacement = "\\1", B.mean$Parameter))
+      
+      df <- data.frame(rand.levels, index = 1:length(rand.levels))
+      names(df) <- c(family, "index")
+      
+      # recombine to link year and index number of the year
+      B.mean <- dplyr::left_join(B.mean, df, by = "index")
+      }
+  
+  return(B.mean)
+  }
+
+#B.ar1 <- nameCoefs(coef.summary = coef.summary, rand.levels = levels(as.factor(tempDataSyncS$site)), family = "ar1")
+#names(B.ar1) <- c("Parameter", "mean", "sd", "qLo", "qHi", "index", "site")
+B.ar1 <- dplyr::filter(coef.summary, grepl('^B.ar1', coef.summary$Parameter))
+
+B.year <- nameCoefs(coef.summary = coef.summary, rand.levels = levels(as.factor(tempDataSyncS$year)), param.names = colnames(data.random.years), family = "year")
+
+B.site <- nameCoefs(coef.summary = coef.summary, rand.levels = levels(as.factor(tempDataSyncS$site)), param.names = colnames(data.random.sites), family = "site")
+
+B.huc <- nameCoefs(coef.summary = coef.summary, rand.levels = levels(as.factor(tempDataSyncS$HUC8)), param.names = colnames(data.random.sites), family = "huc")
+
+# Then Predict:
+tempDataSyncS$Pred <- NA
+trend <- NA
+for(i in 1:length(firstObsRows$rowNum)) {
+  trend[firstObsRows$rowNum[i]] <- as.numeric(
+    B.fixed$mean %*% t(data.fixed[firstObsRows$rowNum[i], ]) + 
+      filter(B.huc, huc == as.character(tempDataSyncS$HUC8[firstObsRows$rowNum[i]]))$mean %*% t(data.random.sites[firstObsRows$rowNum[i], ]) + 
+      filter(B.site, site == as.character(tempDataSyncS$site[firstObsRows$rowNum[i]]))$mean %*% t(data.random.sites[firstObsRows$rowNum[i], ]) + 
+      filter(B.year, year == as.character(tempDataSyncS$year[firstObsRows$rowNum[i]]))$mean %*% t(data.random.years[firstObsRows$rowNum[i], ])
+    )
+  
+  tempDataSyncS$Pred[firstObsRows$rowNum[i]] <- trend[firstObsRows$rowNum[i]]
+  }
+for(i in 1:length(evalRows$rowNum)) {
+  trend[evalRows$rowNum[i]] <- as.numeric(
+    B.fixed$mean %*% t(data.fixed[evalRows$rowNum[i], ]) + 
+      filter(B.huc, huc == as.character(tempDataSyncS$HUC8[evalRows$rowNum[i]]))$mean %*% t(data.random.sites[evalRows$rowNum[i], ]) + 
+      filter(B.site, site == as.character(tempDataSyncS$site[evalRows$rowNum[i]]))$mean %*% t(data.random.sites[evalRows$rowNum[i], ]) + 
+      filter(B.year, year == as.character(tempDataSyncS$year[evalRows$rowNum[i]]))$mean %*% t(data.random.years[evalRows$rowNum[i], ]) 
+    )
+      
+      #filter(B.ar1, site == as.character(tempDataSyncS$site[evalRows$rowNum[i]]))$mean * (tempDataSyncS$temp[evalRows$rowNum[i]-1] - tempDataSyncS$Pred[evalRows$rowNum[i]-1])
+  }
+
+for(i in 1:length(evalRows$rowNum)) {
+    tempDataSyncS$Pred[evalRows$rowNum[i]] <- trend[evalRows$rowNum[i]] + as.numeric(B.ar1$mean * (tempDataSyncS$temp[evalRows$rowNum[i]-1] - trend[evalRows$rowNum[i]-1])
+                                                                                     )
+}
+
+library(ggplot2)
+ggplot(tempDataSyncS, aes(temp, Pred)) + geom_point() + geom_abline(aes(1,1), colour = 'blue')
+
+tempDataSyncS$resid.r <- tempDataSyncS$temp - tempDataSyncS$Pred
+
+rmse(tempDataSyncS$resid.r)
+rmse(tempDataSyncS$resid.ar1)
+
+tempDataSyncS$Pred.jags <- tempDataSyncS$temp - tempDataSyncS$resid.ar1
+
+#summary(tempDataSyncS)
+
+ggplot(tempDataSyncS, aes(Pred.jags, Pred)) + geom_point()
 
 ```
 
