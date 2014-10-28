@@ -244,6 +244,41 @@ evalRows <- tempDataSyncS %>%
                   select(rowNum)
 ```
 
+```{r}
+
+# sort by site, year, date
+tbl_df(tempDataSyncValidS)
+tempDataSyncValidS <- arrange(tempDataSyncValidS, HUC8, site, date)
+
+# Within each site, if column above doesn't equal date + 1 then start new deployment ID
+# SLOW - consider rewriting or moving to C++
+tempDataSyncValidS$deployID <- NA
+tempDataSyncValidS$deployID[1] <- 1
+for(i in 2:nrow(tempDataSyncValidS)) {
+  if(tempDataSyncValidS$site[i] == tempDataSyncValidS$site[i-1] & 
+       tempDataSyncValidS$date[i] == tempDataSyncValidS$date[i -1] + 1) {
+    tempDataSyncValidS$deployID[i] <- tempDataSyncValidS$deployID[i-1]
+    } else {
+      tempDataSyncValidS$deployID[i] <- tempDataSyncValidS$deployID[i-1] + 1
+      }
+  } # rewrite by shifting one df down by one and comparing if equal
+
+head(tempDataSyncValidS, 100)
+summary(tempDataSyncValidS)
+
+tempDataSyncValidS$rowNum <- 1:dim(tempDataSyncValidS)[1]
+
+firstObsRows.valid <- tempDataSyncValidS %>%
+                  group_by(deployID) %>%
+                  filter(date == min(date))%>%
+                  select(rowNum)
+
+evalRows.valid <- tempDataSyncValidS %>%
+                  group_by(deployID) %>%
+                  filter(date != min(date))%>%
+                  select(rowNum)
+```
+
 ```{r make AR vector}
 deploy.length <- table(tempDataSyncS$deployID) # named vector, length of each deployment (never longer than the syncronized season)
 

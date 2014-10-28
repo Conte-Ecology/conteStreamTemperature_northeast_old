@@ -36,39 +36,37 @@ print(getwd())
 # rename all variables before setting the fixed and random, then select them by list?
 ####
 
-## Change to use model matrix for simplicity and consistency?
-data.fixed <- data.frame(intercept = 1,
-                    lat = tempDataSyncS$Latitude,
-                    lon = tempDataSyncS$Longitude,
-                    drainage = tempDataSyncS$TotDASqKM,
-                    forest = tempDataSyncS$Forest,
-                    elevation = tempDataSyncS$ReachElevationM,
-                    coarseness = tempDataSyncS$SurficialCoarseC,
-                    wetland = tempDataSyncS$CONUSWetland,
-                    impoundments = tempDataSyncS$ImpoundmentsAllSqKM,
-                    airT.drainage = tempDataSyncS$airTemp * tempDataSyncS$TotDASqKM)
+ fixed.form <- formula( ~ 1 
+                        + Latitude 
+                        + Longitude 
+                        + TotDASqKM 
+                        + Forest 
+                        + ReachElevationM 
+                        + SurficialCoarseC 
+                        + CONUSWetland 
+                        + ImpoundmentsAllSqKM 
+                        + airTemp:TotDASqKM
+                        )
 
-# Benefit of using model matrix?
- fixed.form <- formula( ~ 1 + Latitude + Longitude + airTemp * TotDASqKM)
- data.fixed <- model.matrix(fixed.form, tempDataSyncS)
-# str(data.fixed)
-# head(data.fixed)
- colnames(data.fixed)
+site.form <- formula( ~ 1 
+                      + airTemp 
+                      + airTempLagged2 
+                      + prcp 
+                      + prcpLagged1 
+                      + airTemp:prcp
+                      )
 
-data.random.sites <- data.frame(intercept.site = 1, 
-                     airTemp = tempDataSyncS$airTemp, 
-                     #airTempLag1 = tempDataSyncS$airTempLagged1,
-                     airTempLag2 = tempDataSyncS$airTempLagged2,
-                     precip = tempDataSyncS$prcp,
-                     precipLag1 = tempDataSyncS$prcpLagged1,
-                     #precipLag2 = tempDataSyncS$prcpLagged2,
-                    # effect of interaction with random and fixed effects?
-                     airT.precip = tempDataSyncS$airTemp * tempDataSyncS$prcp) # airT.precip2 = tempDataSyncS$airTemp * tempDataSyncS$prcpLagged1 - doesn't converge
+year.form <- formula( ~ 1 
+                      + dOY 
+                      + I(dOY^2) 
+                      + I(dOY^3)
+                      )
 
-data.random.years <- data.frame(intercept.year = 1, 
-                     dOY = tempDataSyncS$dOY, 
-                     dOY2 = tempDataSyncS$dOY^2,
-                     dOY3 = tempDataSyncS$dOY^3)
+formulae <- list(fixed.form = fixed.form, site.form = site.form, year.form = year.form)
+
+
+#data.cal <- prepDF(tempDataSyncS, formulae = formulae)
+#str(data.cal)
 
 monitor.params <- c("residuals",
             #"deviance",
@@ -91,7 +89,7 @@ monitor.params <- c("residuals",
             "sigma.b.year")
 
 coda.tf <- T # currently only works in full for TRUE (using coda.samples)
-system.time(M.ar1 <- modelRegionalTempAR1(tempDataSyncS, data.fixed=data.fixed, data.random.sites=data.random.sites, data.random.years=data.random.years, firstObsRows = firstObsRows, evalRows = evalRows, n.burn = 10, n.it = 50, n.thin = 1, nc = 3, coda = coda.tf, param.list = monitor.params)) # Slow with AR1: ~3-6 min per 100 iterations (13 min per 100 iter for site AR)
+system.time(M.ar1 <- modelRegionalTempAR1(tempDataSyncS, formulae = formulae, firstObsRows = firstObsRows, evalRows = evalRows, n.burn = 1, n.it = 100, n.thin = 1, nc = 3, coda = coda.tf, param.list = monitor.params)) # Slow with AR1: ~3-6 min per 100 iterations (13 min per 100 iter for site AR)
 
 save(M.ar1, file = paste0(dataLocalDir, "northeast-mcmc.RData"))
 
@@ -180,64 +178,55 @@ gc()
 
 library(rjags)
 
-avgCoefs <- function(ggs.obj, family = NULL) {
-  #detach("package:ggmcmc", unload = TRUE)
-  require(dplyr)
-  if(class(family) == "character") {
-    means <- ggs.obj %>%
-      group_by(Parameter = Parameter) %>%
-      filter(grepl(paste0('^', family), Parameter)) %>%
-      dplyr::summarise(mean=mean(value), sd=sd(value), qLo=quantile(value,probs=c(0.025)),qHi=quantile(value,probs=c(0.975)))
-    } else {
-      means <- ggs.obj %>%
-        group_by(Parameter = Parameter) %>%
-        dplyr::summarise(mean=mean(value), sd=sd(value), qLo=quantile(value,probs=c(0.025)),qHi=quantile(value,probs=c(0.975)))
-      }
-  return(means)
-  }
 
-
-#system.time(coef.summary.B0 <- avgCoefs(ggs.ar1, family = "B.0")) # 48s
 
 B.fixed <- dplyr::filter(coef.summary, grepl('^B.0', coef.summary$Parameter))
+B.fixed$coef <- c("(Intercept)", attr(terms.formula(formulae$fixed.form), "term.labels"))
 
-nameCoefs <- function (coef.summary, rand.levels, family, param.names = NULL) {
-  if(class(param.names) == "character") {
-    B.mean <- filter(coef.summary, grepl(paste0('^B.',family), coef.summary$Parameter))
-    
-    B.mean$index <- as.numeric(sub(".*?([0-9]+),([0-9]).", replacement = "\\1", B.mean$Parameter))
-    B.mean$index2 <- as.numeric(sub(".*?([0-9]+),([0-9]).", replacement = "\\2", B.mean$Parameter))
-    
-    df <- data.frame(rand.levels, index = 1:length(rand.levels))
-    names(df) <- c(family, "index")
-    df.coef <- data.frame(coef = param.names, index2 = 1:length(param.names))
-    
-    B.mean <- dplyr::left_join(B.mean, df, by = "index")
-    B.mean <- dplyr::left_join(B.mean, df.coef, by = "index2")
-    } else {
-      B.mean <- filter(coef.summary, grepl(paste0('^B.',family), coef.summary$Parameter))
-      
-      B.mean$index <- as.numeric(sub(".*?([0-9]+).", replacement = "\\1", B.mean$Parameter))
-      
-      df <- data.frame(rand.levels, index = 1:length(rand.levels))
-      names(df) <- c(family, "index")
-      
-      # recombine to link year and index number of the year
-      B.mean <- dplyr::left_join(B.mean, df, by = "index")
-      }
-  
-  return(B.mean)
-  }
+B.ar1 <- nameCoefs(coef.summary = coef.summary, rand.levels = levels(as.factor(tempDataSyncS$site)), family = 'B.ar1')
+names(B.ar1) <- c("Parameter", "mean", "sd", "qLo", "qHi", "index", "site")
+#B.ar1 <- dplyr::filter(coef.summary, grepl('^B.ar1', coef.summary$Parameter))
 
-#B.ar1 <- nameCoefs(coef.summary = coef.summary, rand.levels = levels(as.factor(tempDataSyncS$site)), family = "ar1")
-#names(B.ar1) <- c("Parameter", "mean", "sd", "qLo", "qHi", "index", "site")
-B.ar1 <- dplyr::filter(coef.summary, grepl('^B.ar1', coef.summary$Parameter))
+B.year <- nameCoefs(coef.summary = coef.summary, rand.levels = levels(as.factor(tempDataSyncS$year)), family = "B.year", form = formulae$year.form, name = "year")
 
-B.year <- nameCoefs(coef.summary = coef.summary, rand.levels = levels(as.factor(tempDataSyncS$year)), param.names = colnames(data.random.years), family = "year")
+B.site <- nameCoefs(coef.summary = coef.summary, rand.levels = levels(as.factor(tempDataSyncS$site)), family = "B.site", form = formulae$site.form, name = "site")
 
-B.site <- nameCoefs(coef.summary = coef.summary, rand.levels = levels(as.factor(tempDataSyncS$site)), param.names = colnames(data.random.sites), family = "site")
+B.huc <- nameCoefs(coef.summary = coef.summary, rand.levels = levels(as.factor(tempDataSyncS$HUC8)), family = "B.huc", form = formulae$site.form, name = "huc")
 
-B.huc <- nameCoefs(coef.summary = coef.summary, rand.levels = levels(as.factor(tempDataSyncS$HUC8)), param.names = colnames(data.random.sites), family = "huc")
+mu.huc <- nameCoefs(coef.summary = coef.summary, rand.levels = levels(as.factor(tempDataSyncS$HUC8)), family = "mu.huc", name = "huc")
+
+# predict to new sites
+test.df <- data.frame(matrix(NA, 4, length(names(tempDataSyncS))))
+names(test.df) <- names(tempDataSyncS)
+test.df$site <- c("one", "two", "three", "MAUSGS_WEST_BROOK")
+test.df$HUC8 <- c("a", "b", "c", "01070004")
+
+data.val <- prepDF(test.df)
+str(data.val)
+
+test.B.site <- test.df %>%
+  dplyr::filter(!(site %in% levels(as.factor(tempDataSync$site)))) %>%
+  dplyr::select(site) %>%
+  dplyr::mutate(mean = 0)
+
+B.site.new <- rbind(B.site[ , c("site", "mean")], test.B.site)
+
+
+
+
+
+tempDataSyncS$Pred <- NA
+tempDataSyncS$Pred <- predictTemp(data = tempDataSyncS, B.fixed = B.fixed, B.site = B.site, B.huc = B.huc, B.year = B.year, B.ar1 = B.ar1)
+
+tempDataSyncValidS$Pred <- NA
+tempDataSyncValidS$Pred <- predictTemp(data = tempDataSyncValidS, firstObsRows = firstObsRows.valid, evalRows = evalRows.valid, B.fixed = B.fixed, B.site = B.site, B.huc = B.huc, B.year = B.year, B.ar1 = B.ar1)
+
+
+library(ggplot2)
+ggplot(tempDataSyncValidS, aes(temp, Pred)) + geom_point() + geom_abline(aes(1,1), colour = 'blue')
+tempDataSyncValidS$resid.r <- tempDataSyncValidS$temp - tempDataSyncValidS$Pred
+rmse(tempDataSyncValidS$resid.r)
+
 
 # Then Predict:
 tempDataSyncS$Pred <- NA
@@ -245,28 +234,26 @@ trend <- NA
 for(i in 1:length(firstObsRows$rowNum)) {
   trend[firstObsRows$rowNum[i]] <- as.numeric(
     B.fixed$mean %*% t(data.fixed[firstObsRows$rowNum[i], ]) + 
-      filter(B.huc, huc == as.character(tempDataSyncS$HUC8[firstObsRows$rowNum[i]]))$mean %*% t(data.random.sites[firstObsRows$rowNum[i], ]) + 
-      filter(B.site, site == as.character(tempDataSyncS$site[firstObsRows$rowNum[i]]))$mean %*% t(data.random.sites[firstObsRows$rowNum[i], ]) + 
-      filter(B.year, year == as.character(tempDataSyncS$year[firstObsRows$rowNum[i]]))$mean %*% t(data.random.years[firstObsRows$rowNum[i], ])
+      dplyr::filter(B.huc, huc == as.character(tempDataSyncS$HUC8[firstObsRows$rowNum[i]]))$mean %*% t(data.random.sites[firstObsRows$rowNum[i], ]) + 
+      dplyr::filter(B.site, site == as.character(tempDataSyncS$site[firstObsRows$rowNum[i]]))$mean %*% t(data.random.sites[firstObsRows$rowNum[i], ]) + 
+      dplyr::filter(B.year, year == as.character(tempDataSyncS$year[firstObsRows$rowNum[i]]))$mean %*% t(data.random.years[firstObsRows$rowNum[i], ])
     )
   
   tempDataSyncS$Pred[firstObsRows$rowNum[i]] <- trend[firstObsRows$rowNum[i]]
   }
+
 for(i in 1:length(evalRows$rowNum)) {
   trend[evalRows$rowNum[i]] <- as.numeric(
     B.fixed$mean %*% t(data.fixed[evalRows$rowNum[i], ]) + 
-      filter(B.huc, huc == as.character(tempDataSyncS$HUC8[evalRows$rowNum[i]]))$mean %*% t(data.random.sites[evalRows$rowNum[i], ]) + 
-      filter(B.site, site == as.character(tempDataSyncS$site[evalRows$rowNum[i]]))$mean %*% t(data.random.sites[evalRows$rowNum[i], ]) + 
-      filter(B.year, year == as.character(tempDataSyncS$year[evalRows$rowNum[i]]))$mean %*% t(data.random.years[evalRows$rowNum[i], ]) 
+      dplyr::filter(B.huc, huc == as.character(tempDataSyncS$HUC8[evalRows$rowNum[i]]))$mean %*% t(data.random.sites[evalRows$rowNum[i], ]) + 
+      dplyr::filter(B.site, site == as.character(tempDataSyncS$site[evalRows$rowNum[i]]))$mean %*% t(data.random.sites[evalRows$rowNum[i], ]) + 
+      dplyr::filter(B.year, year == as.character(tempDataSyncS$year[evalRows$rowNum[i]]))$mean %*% t(data.random.years[evalRows$rowNum[i], ]) 
     )
-      
-      #filter(B.ar1, site == as.character(tempDataSyncS$site[evalRows$rowNum[i]]))$mean * (tempDataSyncS$temp[evalRows$rowNum[i]-1] - tempDataSyncS$Pred[evalRows$rowNum[i]-1])
+  
+  tempDataSyncS$Pred[evalRows$rowNum[i]] <- trend[evalRows$rowNum[i]] + 
+    dplyr::filter(B.ar1, site == as.character(tempDataSyncS$site[evalRows$rowNum[i]]))$mean * (tempDataSyncS$temp[evalRows$rowNum[i]-1] - trend[evalRows$rowNum[i]-1])
+  #as.numeric(B.ar1$mean * (tempDataSyncS$temp[evalRows$rowNum[i]-1] - trend[evalRows$rowNum[i]-1]))
   }
-
-for(i in 1:length(evalRows$rowNum)) {
-    tempDataSyncS$Pred[evalRows$rowNum[i]] <- trend[evalRows$rowNum[i]] + as.numeric(B.ar1$mean * (tempDataSyncS$temp[evalRows$rowNum[i]-1] - trend[evalRows$rowNum[i]-1])
-                                                                                     )
-}
 
 library(ggplot2)
 ggplot(tempDataSyncS, aes(temp, Pred)) + geom_point() + geom_abline(aes(1,1), colour = 'blue')

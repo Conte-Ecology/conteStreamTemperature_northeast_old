@@ -6,18 +6,18 @@
           inprod(B.site[site[firstObsRows[i]], ], X.site[firstObsRows[i], ]) + 
           inprod(B.huc[huc[firstObsRows[i]], ], X.site[firstObsRows[i], ]) + 
           inprod(B.year[year[firstObsRows[i]], ], X.year[firstObsRows[i], ])
-        
+
         stream.mu[firstObsRows[i]] <- trend[firstObsRows[i]]
-      }
-      # restart counter for each deployment
-      for(i in 1:nEvalRows) {
-        trend[evalRows[i]] <- inprod(B.0[], X.0[evalRows[i], ]) + 
-          inprod(B.site[site[evalRows[i]], ], X.site[evalRows[i], ]) + 
-          inprod(B.huc[huc[evalRows[i]], ], X.site[evalRows[i], ]) + 
-          inprod(B.year[year[evalRows[i]], ], X.year[evalRows[i], ])
-        
-        stream.mu[evalRows[i]] <- trend[evalRows[i]] + B.ar1 * (temp[evalRows[i]-1] - trend[evalRows[i]-1]) # B.ar1[site[evalRows[i]]]
-      }
+}
+        # restart counter for each deployment
+        for(i in 1:nEvalRows) {
+          trend[evalRows[i]] <- inprod(B.0[], X.0[evalRows[i], ]) + 
+            inprod(B.site[site[evalRows[i]], ], X.site[evalRows[i], ]) + 
+            inprod(B.huc[huc[evalRows[i]], ], X.site[evalRows[i], ]) + 
+            inprod(B.year[year[evalRows[i]], ], X.year[evalRows[i], ])
+          
+          stream.mu[evalRows[i]] <- trend[evalRows[i]] + B.ar1[site[evalRows[i]]] * (temp[evalRows[i]-1] - trend[evalRows[i]-1])
+        }
       
       for(i in 1:n) {
         temp[i] ~ dnorm(stream.mu[i], tau) # T(0, 50) - truncation causes MCMC problem: no mixing/movement
@@ -25,13 +25,13 @@
       }
       
       # Prior for autoregressive
-      B.ar1 ~ dunif(-1, 1)
-      #for(j in 1:J){ # J sites
-       # B.ar1[j] ~ dnorm(mu.ar1, tau.ar1)#T(-1, 1)
-      #}
-      #mu.ar1 ~ dunif(-1, 1)
-      #sigma.ar1 ~ dunif(0, 10)
-      #tau.ar1 <- pow(sigma.ar1, -2)
+      #B.ar1 ~ dunif(-1, 1)
+      for(j in 1:J){ # J sites
+        B.ar1[j] ~ dnorm(mu.ar1, tau.ar1)T(-1, 1)
+      }
+      mu.ar1 ~ dunif(-1, 1)
+      sigma.ar1 ~ dunif(0, 10)
+      tau.ar1 <- pow(sigma.ar1, -2)
       
       # prior for model variance
       sigma ~ dunif(0, 100)
@@ -94,6 +94,6 @@
       }
       
       # Derived parameters
-      
+
     }
       
