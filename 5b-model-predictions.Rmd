@@ -66,6 +66,7 @@ dataSource <- sourceNames[sourceChoice == T]
 
 fields <- c("agency", "date", "AgencyID", "year", "site", "date", "dOY", "temp", "airTemp", "prcp", "srad", "dayl", "swe")
 
+
 covariateData <- readStreamTempData(timeSeries=FALSE, covariates=TRUE, dataSourceList=dataSource, fieldListTS=fields, fieldListCD='ALL', directory=dataInDir)
 springFallBPs$site <- as.character(springFallBPs$site)
 
@@ -153,72 +154,6 @@ tempFullSyncS$cYear <- as.character(tempFullSyncS$year)
 
 ```{r}
 
-# if site, huc, or year not in original data ( %in% tempDataSync) use 0 for B.site, B.huc, B.year
-
-
-
-
-```
-
-
-```{r}
-tempFullSyncS$siteYear <- paste0(tempFullSyncS$site, tempFullSyncS$year)
-tempDataSyncS$siteYear <- paste0(tempDataSyncS$site, tempDataSyncS$year)
-
-tempFullSiteYearS <- tempFullSyncS[which(tempFullSyncS$siteYear %in% unique(tempDataSyncS$siteYear)), ]
-tempFullMeanS <- subset(tempFullSyncS, !(tempFullSyncS$siteYear %in% unique(tempDataSyncS$siteYear)))
-
-# this will work fo MA because not predicting to any completely new sites
-tempFullSiteYearS <- filter(tempFullSyncS, filter = year %in% unique(tempDataSyncS$year))
-tempFullSiteS <- filter(tempFullSyncS, filter = !(year %in% unique(tempDataSyncS$year)))
-
-tempFullSiteYearS$tempPredicted <- modSummary@fixEf["intercept", "Mean"] +
-  BSite[tempFullSiteYearS$site, "intercept.site"] + 
-  BYear[tempFullSiteYearS$cYear, "intercept.year"] + 
-  modSummary@fixEf["lat", "Mean"]*tempFullSiteYearS$Latitude + 
-  modSummary@fixEf["lon", "Mean"]*tempFullSiteYearS$Longitude + 
-  BSite[tempFullSiteYearS$site, "airTemp"]*tempFullSiteYearS$airTemp + 
-  BSite[tempFullSiteYearS$site, "airTempLag1"]*tempFullSiteYearS$airTempLagged1 + 
-  BSite[tempFullSiteYearS$site, "airTempLag2"]*tempFullSiteYearS$airTempLagged2 + 
-  BSite[tempFullSiteYearS$site, "precip"]*tempFullSiteYearS$prcp + 
-  BSite[tempFullSiteYearS$site, "precipLag1"]*tempFullSiteYearS$prcpLagged1 + 
-  BSite[tempFullSiteYearS$site, "precipLag2"]*tempFullSiteYearS$prcpLagged2 + 
-  BSite[tempFullSiteYearS$site, "drainage"]*tempFullSiteYearS$TotDASqKM + 
-  BSite[tempFullSiteYearS$site, "forest"]*tempFullSiteYearS$Forest + 
-  BSite[tempFullSiteYearS$site, "elevation"]*tempFullSiteYearS$ReachElevationM + 
-  BSite[tempFullSiteYearS$site, "coarseness"]*tempFullSiteYearS$SurficialCoarseC + 
-  BSite[tempFullSiteYearS$site, "wetland"]*tempFullSiteYearS$CONUSWetland + 
-  BSite[tempFullSiteYearS$site, "impoundments"]*tempFullSiteYearS$ImpoundmentsAllSqKM + 
-  BSite[tempFullSiteYearS$site, "swe"]*tempFullSiteYearS$swe + 
-  BYear[tempFullSiteYearS$cYear, "dOY"]*tempFullSiteYearS$dOY + 
-  BYear[tempFullSiteYearS$cYear, "dOY2"]*((tempFullSiteYearS$dOY)^2) + 
-  BYear[tempFullSiteYearS$cYear, "dOY3"]*((tempFullSiteYearS$dOY)^3)
-
-tempFullSiteS$tempPredicted <- modSummary@fixEf["intercept", "Mean"] +
-  BSite[tempFullSiteS$site, "intercept.site"] + 
-  modSummary@fixEf["lat", "Mean"]*tempFullSiteS$Latitude + 
-  modSummary@fixEf["lon", "Mean"]*tempFullSiteS$Longitude + 
-  BSite[tempFullSiteS$site, "airTemp"]*tempFullSiteS$airTemp + 
-  BSite[tempFullSiteS$site, "airTempLag1"]*tempFullSiteS$airTempLagged1 + 
-  BSite[tempFullSiteS$site, "airTempLag2"]*tempFullSiteS$airTempLagged2 + 
-  BSite[tempFullSiteS$site, "precip"]*tempFullSiteS$prcp + 
-  BSite[tempFullSiteS$site, "precipLag1"]*tempFullSiteS$prcpLagged1 + 
-  BSite[tempFullSiteS$site, "precipLag2"]*tempFullSiteS$prcpLagged2 + 
-  BSite[tempFullSiteS$site, "drainage"]*tempFullSiteS$TotDASqKM + 
-  BSite[tempFullSiteS$site, "forest"]*tempFullSiteS$Forest + 
-  BSite[tempFullSiteS$site, "elevation"]*tempFullSiteS$ReachElevationM + 
-  BSite[tempFullSiteS$site, "coarseness"]*tempFullSiteS$SurficialCoarseC + 
-  BSite[tempFullSiteS$site, "wetland"]*tempFullSiteS$CONUSWetland + 
-  BSite[tempFullSiteS$site, "impoundments"]*tempFullSiteS$ImpoundmentsAllSqKM + 
-  BSite[tempFullSiteS$site, "swe"]*tempFullSiteS$swe + 
-  modSummary@fixEf["dOY", "Mean"]*tempFullSiteS$dOY + 
-  modSummary@fixEf["dOY2", "Mean"]*((tempFullSiteS$dOY)^2) + 
-  modSummary@fixEf["dOY3", "Mean"]*((tempFullSiteS$dOY)^3)
-
-
-tempFullS <- rbind(tempFullSiteYearS, tempFullSiteS)
-
-tempFull <- left_join(tempFullSync, tempFullS[ , c("year", "site", "date", "tempPredicted")], by = c("year", "site", "date")) 
 
 save(tempFullS, tempFull, modSummary, file = "localData/model-summary-predictions.RData")
 
@@ -305,6 +240,16 @@ for(i in 1:length(unique(tempDataSync$site))){
 } # surprisingly fast
 
 rmse(tempFull[which(!is.na(tempFull$temp)), "temp"] - tempFull[!is.na(tempFull$temp), "tempPredicted"])
+```
+
+
+# plots in functions
+
+```{r}
+plotPredict(observed = tempDataSync, predicted = tempDataSyncS, siteList = "ALL", yearList = "ALL", dir = paste0(dataLocalDir, 'plots/fullRecord/'))
+
+
+
 ```
 
 ###Derived metrics

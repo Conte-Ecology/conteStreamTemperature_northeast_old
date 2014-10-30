@@ -10,23 +10,15 @@ library(dplyr)
 library(DataCombine) # for the slide function
 #library(nlme)
 library(devtools)
-#install_github("conteStreamTemperature", username = "Conte-Ecology")
+install_github("Conte-Ecology/conteStreamTemperature")
 library(conteStreamTemperature)
 
-#stempDataSyncwd('/Users/Dan/Documents/Research/Stream_Climate_Change/temperatureProject/')
-#stempDataSyncwd('C:/Users/dhocking/Documents/temperatureProject/')
-
-#baseDir <- 'C:/KPONEIL/GitHub/projects/temperatureProject/'
-#baseDir <- '/Users/Dan/Documents/Research/Stream_Climate_Change/temperatureProject/'
 baseDir <- getwd()
 
 dataInDir <- paste0(baseDir, '/dataIn/')
 dataOutDir <- paste0(baseDir, '/dataOut/')
 dataLocalDir <- paste0(baseDir, '/localData/')
 graphsDir <- paste0(baseDir, '/graphs/')
-
-#source(paste0(baseDir, 'code/functions/temperatureModelingFunctions.R'))
-#source(paste0(baseDir, 'code/functions/dataIndexingFunctions.R'))
 
 load(paste0(dataOutDir, 'springFallBreakpoints.RData'))
 
@@ -53,6 +45,17 @@ sourceNames  <- c   ('CTDEP', 'MAFW', 'MAUSGS', 'MADEP', 'NHFG', 'NHDES', 'MEDMR
 dataSource <- sourceNames[sourceChoice == T]
 
 fields <- c("agency", "date", "AgencyID", "year", "site", "date", "dOY", "temp", "airTemp", "prcp", "srad", "dayl", "swe")
+
+
+var.names <- c("Latitude", "Longitude", "airTemp", "airTempLagged1", "airTempLagged2", "prcp", "prcpLagged1", "prcpLagged2", "prcpLagged3", "dOY", "Forest", "Herbacious", "Agriculture", "Developed", "TotDASqKM", "ReachElevationM", "ImpoundmentsAllSqKM", "HydrologicGroupAB", "SurficialCoarseC", "CONUSWetland", "ReachSlopePCNT", "srad", "dayl", "swe")
+
+prepDataWrapper(var.names = var.names, dataInDir = dataInDir, dataOutDir = dataOutDir)
+```
+
+
+
+
+
 
 tempData <- readStreamTempData(timeSeries=TRUE, covariates=TRUE, dataSourceList=dataSource, fieldListTS=fields, fieldListCD='ALL', directory=dataInDir)
 springFallBPs$site <- as.character(springFallBPs$site)
@@ -96,7 +99,7 @@ tempDataSync <- tempDataSync[ , c("agency", "date", "AgencyID", "year", "fyear",
 
 summary(tempDataSync)
 dim(tempDataSync)
-tempDataSync <- na.omit(tempDataSync) ####### Change this so don't take out NA in stream temperature
+tempDataSync <- na.omit(tempDataSync) ####### Change this so don't take out NA in stream temperature?
 dim(tempDataSync)
 ```
 
@@ -206,97 +209,29 @@ tempDataSyncValidS$fsite <- as.factor(tempDataSyncValidS$site)
 ### Add unique deployment column and create vector to loop through for each unique site-deployment
 
 ```{r}
-# sort by site, year, date
-tbl_df(tempDataSyncS)
-tempDataSyncS <- arrange(tempDataSyncS, HUC8, site, date)
+# Data for fitting
+tempDataSyncS <- indexDeployments(tempDataSyncS, regional = TRUE)
+rows <- createDeployRows(tempDataSyncS)
+firstObsRows <- rows$firstObsRows
+evalRows <- rows$evalRows
 
-# Within each site, if column above doesn't equal date + 1 then start new deployment ID
-# SLOW - consider rewriting or moving to C++
-tempDataSyncS$deployID <- NA
-tempDataSyncS$deployID[1] <- 1
-for(i in 2:nrow(tempDataSyncS)) {
-  if(tempDataSyncS$site[i] == tempDataSyncS$site[i-1] & 
-       tempDataSyncS$date[i] == tempDataSyncS$date[i -1] + 1) {
-    tempDataSyncS$deployID[i] <- tempDataSyncS$deployID[i-1]
-    } else {
-      tempDataSyncS$deployID[i] <- tempDataSyncS$deployID[i-1] + 1
-      }
-  } # rewrite by shifting one df down by one and comparing if equal
-
-head(tempDataSyncS, 100)
-summary(tempDataSyncS)
-
-```
-
-Need to make a vector to cycle through for doing the autoregressive for each unique deployment
-
-```{r}
-tempDataSyncS$rowNum <- 1:dim(tempDataSyncS)[1]
-
-firstObsRows <- tempDataSyncS %>%
-                  group_by(deployID) %>%
-                  filter(date == min(date))%>%
-                  select(rowNum)
-
-evalRows <- tempDataSyncS %>%
-                  group_by(deployID) %>%
-                  filter(date != min(date))%>%
-                  select(rowNum)
-```
-
-```{r}
-
-# sort by site, year, date
-tbl_df(tempDataSyncValidS)
-tempDataSyncValidS <- arrange(tempDataSyncValidS, HUC8, site, date)
-
-# Within each site, if column above doesn't equal date + 1 then start new deployment ID
-# SLOW - consider rewriting or moving to C++
-tempDataSyncValidS$deployID <- NA
-tempDataSyncValidS$deployID[1] <- 1
-for(i in 2:nrow(tempDataSyncValidS)) {
-  if(tempDataSyncValidS$site[i] == tempDataSyncValidS$site[i-1] & 
-       tempDataSyncValidS$date[i] == tempDataSyncValidS$date[i -1] + 1) {
-    tempDataSyncValidS$deployID[i] <- tempDataSyncValidS$deployID[i-1]
-    } else {
-      tempDataSyncValidS$deployID[i] <- tempDataSyncValidS$deployID[i-1] + 1
-      }
-  } # rewrite by shifting one df down by one and comparing if equal
-
-head(tempDataSyncValidS, 100)
-summary(tempDataSyncValidS)
-
-tempDataSyncValidS$rowNum <- 1:dim(tempDataSyncValidS)[1]
-
-firstObsRows.valid <- tempDataSyncValidS %>%
-                  group_by(deployID) %>%
-                  filter(date == min(date))%>%
-                  select(rowNum)
-
-evalRows.valid <- tempDataSyncValidS %>%
-                  group_by(deployID) %>%
-                  filter(date != min(date))%>%
-                  select(rowNum)
-```
-
-```{r make AR vector}
-deploy.length <- table(tempDataSyncS$deployID) # named vector, length of each deployment (never longer than the syncronized season)
-
-deploy.cumsum <- cumsum(deploy.length)
-
-deploy.vect <- c(0, deploy.cumsum) + 1
-
-# Now do this for the validation data? Needed for predictions?
+# Data for validation
+tempDataSyncValidS <- indexDeployments(tempDataSyncValidS, regional = TRUE)
+rows.valid <- createDeployRows(tempDataSyncValidS)
+firstObsRowsValid <- rows.valid$firstObsRows
+evalRowsValid <- rows.valid$evalRows
 
 ```
 
 ```{r save tempDataSync for use in analysis}
 
-save(tempDataSync, tempDataSyncS, tempDataSyncValid, tempDataSyncValidS, firstObsRows, evalRows, file=paste0(dataOutDir, 'tempDataSync.RData'))
+save(tempDataSync, tempDataSyncS, tempDataSyncValid, tempDataSyncValidS, firstObsRows, evalRows, firstObsRowsValid, evalRowsValid, file=paste0(dataOutDir, 'tempDataSync.RData'))
 
 ```
 
 Left out to save time:
+# problem is what to do with the first 5 days of each deployment so we don't lose that data. Could do this for all the weather data then merge into the analysis data
+
 ----------------------------------------------------------------------------------------------------------------------------------------------------------------
 # 5-day mean of prcp 
 siteYearCombos <- unique(tempDataSync[,c('site','year')])
@@ -311,7 +246,7 @@ for (i in 1:nrow(siteYearCombos)){
   currSite <- which(tempDataSync$site == as.character(siteYearCombos$site[i]) & tempDataSync$year == siteYearCombos$year[i] )
 
   #Need this so sites with very short records don't crash the loop.
-  if(length(currSite) >= window){currMean <-  rollapply(tempDataSync$prcp[currSite], width=window, fill=NA, mean, align = 'left')} else(currMean <- NA)
+  if(length(currSite) >= window){currMean <-  zoo::rollapply(tempDataSync$prcp[currSite], width=window, fill=NA, mean, align = 'left')} else(currMean <- NA)
   
   tempDataSync$prcp5Day[currSite] <- currMean
 }
