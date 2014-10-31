@@ -3,15 +3,18 @@
 Note: run 2-calcSpringFallBP before running this script
 
 ```{r load libs}
-#rm(list=ls())
+rm(list=ls())
+gc()
 
-#library(ggplot2)
-#library(dplyr)
-#library(DataCombine) # for the slide function
+library(ggplot2)
+library(ggmcmc) # load before dplyr so later plyr doesn't override dplyr
+library(dplyr)
+library(DataCombine) # for the slide function
 #library(nlme)
 library(devtools)
 install_github("Conte-Ecology/conteStreamTemperature")
 library(conteStreamTemperature)
+
 
 baseDir <- getwd()
 
@@ -49,14 +52,14 @@ fields <- c("agency", "date", "AgencyID", "year", "site", "date", "dOY", "temp",
 
 var.names <- c("Latitude", "Longitude", "airTemp", "airTempLagged1", "airTempLagged2", "prcp", "prcpLagged1", "prcpLagged2", "prcpLagged3", "dOY", "Forest", "Herbacious", "Agriculture", "Developed", "TotDASqKM", "ReachElevationM", "ImpoundmentsAllSqKM", "HydrologicGroupAB", "SurficialCoarseC", "CONUSWetland", "ReachSlopePCNT", "srad", "dayl", "swe")
 
-prepDataWrapper(var.names = var.names, dataInDir = dataInDir, dataOutDir = dataOutDir, file = paste0(dataOutDir, "tempDataSync.Rdata"))
+prepDataWrapper(var.names = var.names, dataInDir = dataInDir, dataOutDir = dataOutDir, file = paste0(dataOutDir, "tempDataSync-MA.Rdata"))
 ```
 
 
 
 
 
-
+```{r}
 tempData <- readStreamTempData(timeSeries=TRUE, covariates=TRUE, dataSourceList=dataSource, fieldListTS=fields, fieldListCD='ALL', directory=dataInDir)
 springFallBPs$site <- as.character(springFallBPs$site)
 
@@ -210,16 +213,14 @@ tempDataSyncValidS$fsite <- as.factor(tempDataSyncValidS$site)
 
 ```{r}
 # Data for fitting
-tempDataSyncS <- indexDeployments(tempDataSyncS, regional = TRUE)
-rows <- createDeployRows(tempDataSyncS)
-firstObsRows <- rows$firstObsRows
-evalRows <- rows$evalRows
+    tempDataSyncS <- indexDeployments(tempDataSyncS, regional = TRUE)
+    firstObsRows <- createFirstRows(tempDataSyncS)
+    evalRows <- createEvalRows(tempDataSyncS)
 
 # Data for validation
-tempDataSyncValidS <- indexDeployments(tempDataSyncValidS, regional = TRUE)
-rows.valid <- createDeployRows(tempDataSyncValidS)
-firstObsRowsValid <- rows.valid$firstObsRows
-evalRowsValid <- rows.valid$evalRows
+    tempDataSyncValidS <- indexDeployments(tempDataSyncValidS, regional = TRUE)
+    firstObsRowsValid <- createFirstRows(tempDataSyncValidS)
+    evalRowsValid <- createEvalRows(tempDataSyncValidS)
 
 ```
 
