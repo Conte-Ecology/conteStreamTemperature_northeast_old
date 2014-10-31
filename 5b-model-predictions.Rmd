@@ -6,7 +6,7 @@ output: html_document
 ---
 
 ```{r}
-#rm(list=ls())
+rm(list=ls())
 
 #library(devtools)
 # devtools::install_github("hadley/dplyr") # not working
@@ -65,6 +65,11 @@ sourceNames  <- c   ('CTDEP', 'MAFW', 'MAUSGS', 'MADEP', 'NHFG', 'NHDES', 'MEDMR
 dataSource <- sourceNames[sourceChoice == T]
 
 fields <- c("agency", "date", "AgencyID", "year", "site", "date", "dOY", "temp", "airTemp", "prcp", "srad", "dayl", "swe")
+
+
+var.names <- c("Latitude", "Longitude", "airTemp", "airTempLagged1", "airTempLagged2", "prcp", "prcpLagged1", "prcpLagged2", "prcpLagged3", "dOY", "Forest", "Herbacious", "Agriculture", "Developed", "TotDASqKM", "ReachElevationM", "ImpoundmentsAllSqKM", "HydrologicGroupAB", "SurficialCoarseC", "CONUSWetland", "ReachSlopePCNT", "srad", "dayl", "swe")
+
+#prepDataWrapper(var.names = var.names, dataInDir = dataInDir, dataOutDir = dataOutDir, data.fit = tempDataSyncS, predict.daymet = TRUE, file = "localData/prediction-data.RData")
 
 
 covariateData <- readStreamTempData(timeSeries=FALSE, covariates=TRUE, dataSourceList=dataSource, fieldListTS=fields, fieldListCD='ALL', directory=dataInDir)

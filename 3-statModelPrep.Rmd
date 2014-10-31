@@ -3,11 +3,11 @@
 Note: run 2-calcSpringFallBP before running this script
 
 ```{r load libs}
-rm(list=ls())
+#rm(list=ls())
 
-library(ggplot2)
-library(dplyr)
-library(DataCombine) # for the slide function
+#library(ggplot2)
+#library(dplyr)
+#library(DataCombine) # for the slide function
 #library(nlme)
 library(devtools)
 install_github("Conte-Ecology/conteStreamTemperature")
@@ -49,7 +49,7 @@ fields <- c("agency", "date", "AgencyID", "year", "site", "date", "dOY", "temp",
 
 var.names <- c("Latitude", "Longitude", "airTemp", "airTempLagged1", "airTempLagged2", "prcp", "prcpLagged1", "prcpLagged2", "prcpLagged3", "dOY", "Forest", "Herbacious", "Agriculture", "Developed", "TotDASqKM", "ReachElevationM", "ImpoundmentsAllSqKM", "HydrologicGroupAB", "SurficialCoarseC", "CONUSWetland", "ReachSlopePCNT", "srad", "dayl", "swe")
 
-prepDataWrapper(var.names = var.names, dataInDir = dataInDir, dataOutDir = dataOutDir)
+prepDataWrapper(var.names = var.names, dataInDir = dataInDir, dataOutDir = dataOutDir, file = paste0(dataOutDir, "tempDataSync.Rdata"))
 ```
 
 
