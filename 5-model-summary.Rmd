@@ -1,0 +1,407 @@
+---
+title: "5-model-summary"
+author: "Daniel Hocking"
+date: "August 28, 2014"
+output: html_document
+---
+
+```{r}
+library(rjags)
+# need to load data.fixed, data.random.sites, data.random.years
+#load('dataOut/codaList-M3.Rdata')
+load('localData/northeast-mcmc.RData')
+
+# memory.limit(size = 1e6)
+
+#system.time(summary.stats <- summary(M.ar1)) # takes a long time for full dataset. look for better solution
+
+K.0 <- dim(data.fixed)[2]
+K <- dim(data.random.sites)[2]
+L <- dim(data.random.years)[2]
+J <- length(unique(tempDataSyncS$site))
+n <- dim(tempDataSyncS)[1]
+M <- length(unique(tempDataSyncS$HUC8))
+Ti <- length(unique(tempDataSyncS$year))
+
+```
+
+
+```{r make predictions}
+library(rjags)
+ar1.mat <- as.matrix(M.ar1)
+ar1.mat2 <- apply(ar1.mat, 2, mean)
+
+extractCoef <- function (means.mat, family.name, param.names = NULL, group.ID = NULL, rand.spec = FALSE) {
+  name.vect <- as.character(names(means.mat))
+  df <- data.frame(Parameter = name.vect, Mean = means.mat)
+  B <- dplyr::filter(df, grepl(paste0("^",family.name), Parameter))
+  B$Parameter <- as.character(B$Parameter)
+  K <- length(param.names)
+  if(rand.spec) {
+    M <- length(group.ID)
+    Parameter <- NULL
+    #Parameter <- matrix(NA, M, K)
+    foo <- list()
+    for(m in 1:M) {
+      if(is.null(param.names)) {
+        temp <- B[m, 2]
+      } else {
+        for(k in 1:K) {
+        Parameter[k] <- paste0(family.name,'[',m,',',k,']')
+        }
+      temp <- data.frame(param.names = param.names, Parameter, Order = seq(1, length(param.names)))
+      temp$Parameter <- as.character(temp$Parameter)
+      temp <- left_join(temp, B, by = "Parameter")
+      }
+      temp.name <- paste0(group.ID[m])
+      foo[[temp.name]] <- temp
+      }
+    } else {
+      Parameter <- NULL
+      foo <- NULL
+      for(k in 1:K) {
+        Parameter[k] <- paste0(family.name,'[',k,']')
+        }
+      foo <- data.frame(param.names = param.names, Parameter, Order = seq(1, length(param.names)))
+      foo$Parameter <- as(foo$Parameter, "character")
+      #coef.avg <- avgCoefs(ggs.obj = ggs.obj)
+      foo <- arrange(left_join(foo, B, by = "Parameter"), Order)
+      }
+  
+  return(foo)
+  }
+
+B.fixed <- extractCoef(means.mat = ar1.mat2, param.names = colnames(data.fixed), family.name = "B.0")
+
+hucs <- levels(tempDataSyncS$HUC8)
+B.huc <- extractCoef(means.mat = ar1.mat2, family.name = "B.huc", param.names = colnames(data.random.sites), group.ID = hucs, rand.spec = TRUE)
+
+sites <- levels(tempDataSyncS$site)
+B.site <- extractCoef(ar1.mat2, "B.site", colnames(data.random.sites), group.ID = sites, rand.spec = TRUE)
+
+ B.ar1 <- extractCoef(ar1.mat2, data = NULL, "B.ar1", groupIDs = sites, rand.spec = TRUE)
+#B.ar1 <- ar1.mat2["B.ar1"]
+
+years <- levels(tempDataSyncS$year))
+B.year <- extractCoef(ar1.mat2, data.random.years, "B.year", groupIDs = years, rand.spec = TRUE)
+
+
+# Then Predict:
+tempDataSyncS$Pred <- NA
+for(i in 1:length(firstObsRows$rowNum)) {
+  tempDataSyncS$Pred[firstObsRows$rowNum[i]] <- as.numeric(
+    B.fixed$Mean %*% t(data.fixed[firstObsRows$rowNum[i], ]) + 
+      B.huc[[tempDataSyncS$HUC8[firstObsRows$rowNum[i]]]]$Mean %*% t(data.random.sites[firstObsRows$rowNum[i], ]) + 
+      B.site[[tempDataSyncS$site[firstObsRows$rowNum[i]]]]$Mean %*% t(data.random.sites[firstObsRows$rowNum[i], ]) + 
+      B.year[[as.character(tempDataSyncS$year[firstObsRows$rowNum[i]])]]$Mean %*% t(data.random.years[firstObsRows$rowNum[i], ]))
+  }
+for(i in 1:length(evalRows$rowNum)) {
+  tempDataSyncS$Pred[evalRows$rowNum[i]] <- as.numeric(
+    B.fixed$Mean %*% t(data.fixed[evalRows$rowNum[i], ]) + 
+      B.huc[[tempDataSyncS$HUC8[evalRows$rowNum[i]]]]$Mean %*% t(data.random.sites[evalRows$rowNum[i], ]) + 
+      B.site[[tempDataSyncS$site[evalRows$rowNum[i]]]]$Mean %*% t(data.random.sites[evalRows$rowNum[i], ]) + 
+      B.year[[as.character(tempDataSyncS$year[evalRows$rowNum[i]])]]$Mean %*% t(data.random.years[evalRows$rowNum[i], ]) + 
+      #B.ar1 * (tempDataSyncS$temp[evalRows$rowNum[i]-1] - tempDataSyncS$Pred[evalRows$rowNum[i]-1]))
+      as.numeric(B.ar1[tempDataSyncS$site[evalRows$rowNum[i]]]) * (tempDataSyncS$temp[evalRows$rowNum[i]-1] - tempDataSyncS$Pred[evalRows$rowNum[i]-1]))
+  }
+############ Check order of years!!!!! ##############
+# SLOW (40s for just obseved MA sites and days) - but not sure how to do this without for loop and maintaining matrix multiplication like in JAGS - hard to vectorize with nested random effects
+
+library(ggplot2)
+ggplot(tempDataSyncS, aes(temp, Pred)) + geom_point() + geom_abline(aes(1,1), colour = 'blue')
+
+
+tempDataSyncS$resid.ar1 <- NA
+for(i in 1:length(tempDataSyncS$temp)) {
+  tempDataSyncS$resid.ar1[i] <- mean(ar1.mat[ , paste0("residuals[", i, "]")])
+  #tempDataSyncS$resid.ar1[i] <- ar1.mat[ , paste0("residuals[", i, "]")][1]
+  }
+
+tempDataSyncS$resid.r <- tempDataSyncS$temp - tempDataSyncS$Pred
+
+rmse(tempDataSyncS$resid.r)
+rmse(tempDataSyncS$resid.ar1)
+
+tempDataSyncS$Pred.jags <- tempDataSyncS$temp - tempDataSyncS$resid.ar1
+
+summary(tempDataSyncS)
+
+ggplot(tempDataSyncS, aes(Pred.jags, Pred)) + geom_point()
+
+```
+
+
+# old approach - clunky but basically works
+
+```{r old approach}
+avgCoefs <- function(ggs.obj) {
+  #detach("package:ggmcmc", unload = TRUE)
+  library(dplyr)
+  means <- ggs.obj %>%
+    group_by(Parameter = Parameter) %>%
+    dplyr::summarise(mean=mean(value), sd=sd(value))
+}
+
+
+# Make "Fixed Effects" Output like summary(lmer)
+#codaFixEf <- function (K.0, K, L, variables.fixed, variables.site, variables.year, k, summary.stats, l) {
+  fix.ef <- as.data.frame(matrix(NA, K.0+K+L, 4))
+  names(fix.ef) <- c("Mean", "Std. Error", "LCI", "UCI")
+  row.names(fix.ef) <- c(names(data.fixed), names(data.random.sites), names(data.random.years))
+  for(k in 1:K.0){
+    fix.ef[k, 1:2] <- summary.stats$statistics[paste0('B.0[',k,']') , c("Mean", "SD")]
+    fix.ef[k, 3:4] <- summary.stats$quantiles[paste0('B.0[',k,']') , c("2.5%", "97.5%")]
+  }
+  for(k in 1:K){
+    fix.ef[k+K.0, 1:2] <- summary.stats$statistics[paste0('mu.huc[',k,']') , c("Mean", "SD")]
+    fix.ef[k+K.0, 3:4] <- summary.stats$quantiles[paste0('mu.huc[',k,']') , c("2.5%", "97.5%")]
+  }
+  for(l in 1:L){
+    fix.ef[l+K.0+K, 1:2] <- summary.stats$statistics[paste0('mu.year[',l,']') , c("Mean", "SD")]
+    fix.ef[l+K.0+K, 3:4] <- summary.stats$quantiles[paste0('mu.year[',l,']') , c("2.5%", "97.5%")]
+  }
+#}
+fix.ef
+
+# Make Random Effects Output like summary(lmer)
+ran.ef.huc <- as.data.frame(matrix(NA, K, 2))
+names(ran.ef.huc) <- c("Variance", "SD")
+row.names(ran.ef.huc) <- names(data.random.sites)
+for(k in 1:K){
+  ran.ef.huc[k, 2] <- summary.stats$statistics[paste0('sigma.b.huc[',k,']') , c("Mean")]
+  ran.ef.huc[k, 1] <- ran.ef.huc[k, 2] ^ 2
+}
+ran.ef.huc
+
+B.huc <- as.data.frame(matrix(NA, M, K))
+names(B.huc) <- names(data.random.sites)
+row.names(B.huc) <- unique(tempDataSyncS$HUC8)
+for(m in 1:M){
+  for(k in 1:K){
+    B.huc[m, k] <- summary.stats$statistics[paste('B.huc[',m,',',k,']', sep=""), "Mean"]
+  }
+}
+
+# Random Sites
+ran.ef.site <- as.data.frame(matrix(NA, K, 2))
+names(ran.ef.site) <- c("Variance", "SD")
+row.names(ran.ef.site) <- names(data.random.sites)
+for(k in 1:K){
+  ran.ef.site[k, 2] <- summary.stats$statistics[paste0('sigma.b.site[',k,']') , c("Mean")]
+  ran.ef.site[k, 1] <- ran.ef.site[k, 2] ^ 2
+}
+ran.ef.site
+
+B.site <- as.data.frame(matrix(NA, J, K))
+names(B.site) <- names(data.random.sites)
+row.names(B.site) <- unique(tempDataSyncS$site)
+for(j in 1:J){
+  for(k in 1:K){
+    B.site[j, k] <- summary.stats$statistics[paste('B.site[',j,',',k,']', sep=""), "Mean"]
+  }
+}
+
+# Make Random Effects Output like summary(lmer)
+ran.ef.year <- as.data.frame(matrix(NA, L, 2))
+names(ran.ef.year) <- c("Variance", "SD")
+row.names(ran.ef.year) <- names(data.random.years)
+for(l in 1:L){
+  ran.ef.year[l, 2] <- summary.stats$statistics[paste0('sigma.b.year[',l,']') , c("Mean")]
+  ran.ef.year[l, 1] <- ran.ef.year[l, 2] ^ 2
+}
+ran.ef.year
+
+Y <- length(unique(tempDataSyncS$year))
+B.year <- as.data.frame(matrix(NA, Y, L))
+names(B.year) <- names(data.random.years)
+row.names(B.year) <- unique(tempDataSyncS$year)
+for(y in 1:Y){
+  for(l in 1:L){
+    B.year[y, l] <- summary.stats$statistics[paste('B.year[',y,',',l,']', sep=""), "Mean"]
+  }
+}
+
+# Make correlation matrix of random huc effects
+cor.huc <- as.data.frame(matrix(NA, K, K))
+names(cor.huc) <- names(data.random.sites)
+row.names(cor.huc) <- names(data.random.sites)
+for(k in 1:K){
+  for(k.prime in 1:K){
+    cor.huc[k, k.prime] <- summary.stats$statistics[paste('rho.B.huc[',k,',',k.prime,']', sep=""), "Mean"]
+  }
+}
+cor.huc <- round(cor.huc, digits=3)
+cor.huc[upper.tri(cor.huc, diag=TRUE)] <- ''
+cor.huc
+
+# Make correlation matrix of random year effects
+cor.year <- as.data.frame(matrix(NA, L, L))
+names(cor.year) <- names(data.random.years)
+row.names(cor.year) <- names(data.random.years)
+for(l in 1:L){
+  for(l.prime in 1:L){
+    cor.year[l, l.prime] <- summary.stats$statistics[paste('rho.B.year[',l,',',l.prime,']', sep=""), "Mean"]
+  }
+}
+cor.year <- round(cor.year, digits=3)
+cor.year[upper.tri(cor.year, diag=TRUE)] <- ''
+cor.year
+
+# combine model summary results into an S4 Object
+setClass("jagsSummary",
+         representation(fixEf="data.frame",
+                        ranEf="list",
+                        ranCor="list",
+                        BSite="data.frame",
+                        BHUC="data.frame",
+                        BYear="data.frame"))
+
+modSummary <- new("jagsSummary")
+modSummary@fixEf <- fix.ef
+modSummary@ranEf <- list(ranSite=ran.ef.site, ranHUC=ran.ef.huc, ranYear=ran.ef.year)
+modSummary@ranCor <- list(corSite=cor.huc, corYear=cor.year)
+modSummary@BSite <- B.site
+modSummary@BHUC <- B.huc
+modSummary@BYear <- B.year
+
+# modSummary <- NULL
+# modSummary$fixEf <- fix.ef
+# modSummary$ranEf <- list(ranSite=ran.ef.site, ranYear=ran.ef.year)
+# modSummary$ranCor <- list(corSite=cor.site, corYear=cor.year)
+# modSummary$BSite <- B.site
+# modSummary$BYear <- B.year
+
+#modSummary
+str(modSummary)
+head(modSummary@fixEf)
+head(modSummary@ranEf)
+head(modSummary@ranCor)
+head(modSummary@BSite)
+head(modSummary@BHUC)
+head(modSummary@BYear)
+
+rmse(tempDataSyncS$resid.ar1)
+
+save(modSummary, file=paste0(dataOutDir, 'modSummary.RData'))
+```
+
+```{r figures}
+# Effects of Forest
+# Plot effect of catchment forest on occurrence prob at a typical HUC10 basin # Gelman p. 44
+eff.forest <- data.frame(Forest=seq(0,100,length.out=100))
+eff.forest$forest <- as.numeric(stdCovs(eff.forest, tempDataSync, varNames=c("Forest"))$Forest)
+
+fixEf <- modSummary@fixEf$Mean
+names(fixEf) <- row.names(modSummary@fixEf)
+UCI <- modSummary@fixEf$UCI
+names(UCI) <- row.names(modSummary@fixEf)
+LCI <- modSummary@fixEf$LCI
+names(LCI) <- row.names(modSummary@fixEf)
+
+eff.forest$mean <- fixEf["intercept"] + fixEf["forest"]*eff.forest$forest
+eff.forest$lower <- fixEf["intercept"] + LCI["forest"]*eff.forest$forest
+eff.forest$upper <- fixEf["intercept"] + UCI["forest"]*eff.forest$forest
+
+ggplot(eff.forest, aes(x = Forest, y = mean)) + 
+  geom_ribbon(data=eff.forest, aes(ymin = lower, ymax = upper), fill="grey") +
+  geom_line(colour = "black", size = 1) +
+  xlab("Percent forest cover upstream") +
+  ylab("Stream temperature (C)") +
+  theme_bw() + 
+  ylim(15, 25) +
+  theme(axis.text.y = element_text(size=15),
+        axis.text.x = element_text(size=15),
+        axis.title.x = element_text(size=17, face="bold"),
+        axis.title.y = element_text(size=17, angle=90, face="bold"),
+        plot.title = element_text(size=20))
+
+```
+
+Problem with above is that confidence intervals don't really represent CI for predicted temperature. Could bootstrap with the summary stats I have but that loses some of the value of MCMC iterations.
+
+Try to organize so that predictions can be done for each iteration. This could get big because it would be a prediction for each forest cover value for each iteration (~100 x ~1000-10000 depending how many iterations are saved). This would be done for each variable we want to show the effects of and each scenario we want to do predictions for.
+
+```{r}
+mat.ar1 <- unlist(as.matrix(M.ar1))
+
+# how to replace or keep track of the coefficient names (e.g. "B.0[1]", "B.Site[1,1]")
+n.iter <- dim(mat.ar1)[1]
+fix.eff <- data.frame(matrix(NA, n.iter, K.0 + K + L))
+names(fix.eff) <- c(names(data.fixed), names(data.random.sites), names(data.random.years))
+  for(k in 1:K.0){
+    fix.eff[ , k] <- mat.ar1[ , paste0('B.0[',k,']')]
+  }
+  for(k in 1:K){
+    fix.eff[ , k+K.0] <- mat.ar1[ , paste0('mu.huc[',k,']')]
+  }
+  for(l in 1:L){
+    fix.eff[ , l+K.0+K] <- mat.ar1[ , paste0('mu.year[',l,']')]
+  }
+str(fix.eff)
+head(fix.eff)
+
+```
+
+## the below works so now turn into a function
+
+```{r figures}
+# Effects of Forest
+# Plot effect of catchment forest on occurrence prob at an average site for a typical HUC8 basin # Gelman p. 44
+eff.forest <- data.frame(Forest=seq(0,100,length.out=100))
+eff.forest$forest <- as.numeric(stdCovs(eff.forest, tempDataSync, varNames=c("Forest"))$Forest)
+
+temp.forest <- matrix(NA, n.iter, dim(eff.forest)[1])
+for(i in 1:n.iter) {
+  temp.forest[i, ] <- fix.eff$intercept[i] + fix.eff$forest[i]*eff.forest$forest
+  }
+eff.forest$mean <- apply(temp.forest, MARGIN = 2, mean)
+eff.forest$lower <- apply(temp.forest, MARGIN = 2, quantile, probs = 0.025)
+eff.forest$upper <- apply(temp.forest, MARGIN = 2, quantile, probs = 0.975)
+
+ggplot(eff.forest, aes(x = Forest, y = mean)) + 
+  geom_ribbon(data=eff.forest, aes(ymin = lower, ymax = upper), fill="grey") +
+  geom_line(colour = "black", size = 1) +
+  xlab("Percent forest cover upstream") +
+  ylab("Stream temperature (C)") +
+  theme_bw() + 
+  ylim(15, 25) +
+  theme(axis.text.y = element_text(size=15),
+        axis.text.x = element_text(size=15),
+        axis.title.x = element_text(size=17, face="bold"),
+        axis.title.y = element_text(size=17, angle=90, face="bold"),
+        plot.title = element_text(size=20))
+
+```
+
+
+```{r figures}
+# Effects of Forest
+# Plot effect of catchment forest on occurrence prob at an average site for a typical HUC8 basin # Gelman p. 44
+eff.forest <- data.frame(airTemp=seq(-5, 30, length.out=100))
+eff.forest$airTempS <- as.numeric(stdCovs(eff.forest, tempDataSync, varNames=c("airTemp"))$airTemp)
+
+temp.forest <- matrix(NA, n.iter, dim(eff.forest)[1])
+for(i in 1:n.iter) {
+  temp.forest[i, ] <- fix.eff$intercept[i] + fix.eff$airTemp[i]*eff.forest$airTempS
+  }
+eff.forest$mean <- apply(temp.forest, MARGIN = 2, mean)
+eff.forest$lower <- apply(temp.forest, MARGIN = 2, quantile, probs = 0.025)
+eff.forest$upper <- apply(temp.forest, MARGIN = 2, quantile, probs = 0.975)
+
+ggplot(eff.forest, aes(x = airTemp, y = mean)) + 
+  geom_ribbon(data=eff.forest, aes(ymin = lower, ymax = upper), fill="grey") +
+  geom_line(colour = "black", size = 1) +
+  xlab("Percent forest cover upstream") +
+  ylab("Stream temperature (C)") +
+  theme_bw() + 
+  ylim(0, 25) +
+  theme(axis.text.y = element_text(size=15),
+        axis.text.x = element_text(size=15),
+        axis.title.x = element_text(size=17, face="bold"),
+        axis.title.y = element_text(size=17, angle=90, face="bold"),
+        plot.title = element_text(size=20))
+
+```
+
+
+

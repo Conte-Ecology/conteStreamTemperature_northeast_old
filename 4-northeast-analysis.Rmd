@@ -1,0 +1,268 @@
+---
+title: "4-northeast-analysis"
+author: "Daniel Hocking"
+date: "August 28, 2014"
+output: html_document
+---
+
+```{r}
+
+rm(list=ls())
+gc()
+
+```
+
+
+```{r results = 'hide', warning=FALSE, message=FALSE}
+library(ggplot2)
+library(ggmcmc)
+library(dplyr)
+#library(nlme)
+library(devtools)
+install_github("Conte-Ecology/conteStreamTemperature")
+library(conteStreamTemperature)
+
+baseDir <- getwd() # works as long as you have the project loaded in RStudio - does not work for kniting
+
+dataInDir <- paste0(baseDir, '/dataIn/')
+dataOutDir <- paste0(baseDir, '/dataOut/')
+dataLocalDir <- paste0(baseDir, '/localData/')
+graphsDir <- paste0(baseDir, '/graphs/')
+
+#source(paste0(baseDir, 'code/functions/temperatureModelingFunctions.R'))
+
+# load standardized and formatted data created with the 3-statModelPrep.Rmd script
+load(paste0(dataOutDir, 'tempDataSync-MA.RData'))
+```
+
+```{r eval = FALSE}
+print(getwd())
+```
+
+```{r site within HUC model with residual AR1}
+
+######
+# rename all variables before setting the fixed and random, then select them by list?
+####
+
+ fixed.ef <- c("intercept" 
+                        , "Latitude" 
+                        , "Longitude" 
+                        , "TotDASqKM" 
+                        , "Forest" 
+                        , "ReachElevationM" 
+                        , "SurficialCoarseC" 
+                        , "CONUSWetland" 
+                        , "ImpoundmentsAllSqKM" 
+                        , "airTemp.TotDASqKM"
+                        )
+
+site.ef <- c( "intercept.site" 
+                      , "airTemp" 
+                      , "airTempLagged2" 
+                      , "prcp" 
+                      , "prcpLagged1" 
+                      , "airTemp.prcp"
+                      )
+
+year.ef <- c( "intercept.year"
+                      , "dOY" 
+                      , "dOY2"
+                      , "dOY3"
+                      )
+
+cov.list <- list(fixed.ef = fixed.ef, site.ef = site.ef, year.ef = year.ef)
+# model matrix not working because creates a design matrix
+
+#data.cal <- prepDF(tempDataSyncS, formulae = formulae)
+#str(data.cal)
+
+monitor.params <- c("residuals",
+            #"deviance",
+            "sigma",
+            "B.ar1",
+            "mu.ar1",
+            "sigma.ar1",
+            "B.0",
+            "B.site",
+            "rho.B.site",
+            "mu.site",
+            "sigma.b.site",
+            "B.huc",
+            "rho.B.huc",
+            "mu.huc",
+            "sigma.b.huc",
+            "B.year",
+            "rho.B.year",
+            "mu.year",
+            "sigma.b.year")
+
+coda.tf <- T # currently only works in full for TRUE (using coda.samples)
+system.time(M.ar1 <- modelRegionalTempAR1(tempDataSyncS, cov.list, firstObsRows = firstObsRows, evalRows = evalRows, n.burn = 100, n.it = 500, n.thin = 1, nc = 3, coda = coda.tf, param.list = monitor.params)) # Slow with AR1: ~3-6 min per 100 iterations (13 min per 100 iter for site AR)
+
+save(M.ar1, file = paste0(dataLocalDir, "northeast-mcmc.RData"))
+
+```
+
+## Evaluate MCMC Iterations
+
+```{r check model convergence and mixing}
+system.time(ggs.ar1 <- ggs(M.ar1)) # slow and memory intensive - 2 minutes with residuals saved in mcmc object and no other programs running but uses most of the memory on my 8 GB laptop
+gc() # clears all of the temporary variables stored by ggs and cuts hanging memory more than in half.
+
+
+ggs_traceplot(ggs.ar1, family = "B.0")
+
+ggs_traceplot(ggs.ar1, family = "mu.huc")
+
+ggs_traceplot(ggs.ar1, family = "mu.year")
+
+ggs_traceplot(ggs.ar1, family = "mu.ar1")
+
+ggs_traceplot(ggs.ar1, family = "sigma.ar1")
+
+ggs_traceplot(ggs.ar1, family = "sigma.b.site")
+
+ggs_traceplot(ggs.ar1, family = "sigma.b.huc")
+
+ggs_traceplot(ggs.ar1, family = "sigma.b.year")
+
+ggmcmc(ggs.ar1, file = 'localData/ggmcmc-ar1-rho-huc.pdf', family = "rho.B.huc", plot = "ggs_traceplot")
+
+ggmcmc(ggs.ar1, file = 'localData/ggmcmc-ar1-B-ar1.pdf', family = "B.ar1", plot = c("ggs_traceplot", "ggs_compare_partial", "ggs_autocorrelation"))
+
+```
+
+## Check model fit
+
+```{r check model fit}
+#------ Check residual patterns------
+
+system.time(coef.summary <- avgCoefs(ggs.ar1)) # 15s
+tempDataSyncS$resid.ar1 <- dplyr::filter(coef.summary, grepl('^residuals', coef.summary$Parameter))$mean
+
+# Observed vs Residuals
+g <- ggplot(data.frame(tempDataSyncS), aes(temp, resid.ar1)) 
+#g + geom_point(alpha = 0.3) + geom_smooth() + theme_bw()
+
+library(hexbin)
+g + stat_binhex(bins = 100) + geom_smooth() + theme_bw()
+
+g + geom_point() + geom_density2d() + geom_smooth() + theme_bw()
+
+# Residuals by random HUC8
+b <- ggplot(tempDataSyncS, aes(x = HUC8, y = resid.ar1))
+b + geom_boxplot() + coord_flip()
+
+# Residuals by random site within HUC8
+b <- ggplot(tempDataSyncS, aes(x = site, y = resid.ar1))
+b + geom_boxplot() + coord_flip()
+
+# Residuals by random year
+ggplot(tempDataSyncS, aes(x = as.factor(year), y = resid.ar1)) + geom_boxplot() + coord_flip()
+
+# Residuals by covariates
+ggplot(tempDataSyncS, aes(Forest, resid.ar1)) + geom_point(alpha = 0.5) + geom_smooth() + theme_bw()
+
+ggplot(tempDataSyncS, aes(airTemp, resid.ar1)) + geom_point(alpha = 0.5) + geom_smooth() + theme_bw()
+
+ggplot(tempDataSyncS, aes(dOY, resid.ar1)) + geom_point(alpha = 0.5) + geom_smooth() + theme_bw()
+
+ggplot(tempDataSyncS, aes(dOY^2, resid.ar1)) + geom_point(alpha = 0.5) + geom_smooth() + theme_bw()
+
+# Check Autocorrelation of residuals
+# correlation in MCMC
+acf(ar1.mat[ , "residuals[1]"], lag.max = 40, xlab = "Lag", ylab = "Correlation", main = "")
+acf(ar1.mat[ , "residuals[2]"], lag.max = 40, xlab = "Lag", ylab = "Correlation", main = "")
+
+# correlation in residuals over time 
+acf(tempDataSyncS$resid.ar1, lag.max = 100, xlab = "Lag", ylab = "Correlation", main = "") # not perfect but better than for non-AR model
+
+```
+
+
+```{r test}
+
+gc()
+
+library(rjags)
+
+
+
+B.fixed <- dplyr::filter(coef.summary, grepl('^B.0', coef.summary$Parameter))
+B.fixed$coef <- colnames(data.cal$data.fixed)
+
+B.ar1 <- nameCoefs(coef.summary = coef.summary, rand.levels = levels(as.factor(tempDataSyncS$site)), family = 'B.ar1', name = "site")
+
+B.year <- nameCoefs(coef.summary = coef.summary, rand.levels = levels(as.factor(tempDataSyncS$year)), family = "B.year", coefs = colnames(data.cal$data.random.years), name = "year")
+
+B.site <- nameCoefs(coef.summary = coef.summary, rand.levels = levels(as.factor(tempDataSyncS$site)), family = "B.site", coefs = colnames(data.cal$data.random.sites), name = "site")
+
+B.huc <- nameCoefs(coef.summary = coef.summary, rand.levels = levels(as.factor(tempDataSyncS$HUC8)), family = "B.huc", coefs = colnames(data.cal$data.random.sites), name = "huc")
+
+mu.huc <- nameCoefs(coef.summary = coef.summary, rand.levels = levels(as.factor(tempDataSyncS$HUC8)), family = "mu.huc", name = "huc", conditional = FALSE, coefs = colnames(data.cal$data.random.sites))
+
+mu.year <- nameCoefs(coef.summary = coef.summary, rand.levels = levels(as.factor(tempDataSyncS$year)), family = "mu.year", name = "year", conditional = FALSE, coefs = colnames(data.cal$data.random.years))
+
+sigma.b.site <- nameCoefs(coef.summary = coef.summary, rand.levels = levels(as.factor(tempDataSyncS$site)), family = "sigma.b.site", conditional = FALSE, coefs = colnames(data.cal$data.random.sites))
+
+# predict to new sites
+test.df <- data.frame(matrix(NA, 4, length(names(tempDataSyncS))))
+names(test.df) <- names(tempDataSyncS)
+test.df$site <- c("one", "two", "three", "MAUSGS_WEST_BROOK")
+test.df$HUC8 <- c("a", "b", "c", "01070004")
+
+data.val <- prepDF(test.df)
+str(data.val)
+
+test.B.site <- test.df %>%
+  dplyr::filter(!(site %in% levels(as.factor(tempDataSync$site)))) %>%
+  dplyr::select(site) %>%
+  dplyr::mutate(mean = 0)
+
+B.site.new <- rbind(B.site[ , c("site", "mean")], test.B.site)
+
+
+
+
+
+tempDataSyncS$tempPredicted <- NA
+tempDataSyncS$tempPredicted <- predictTemp(data = tempDataSyncS, B.fixed = B.fixed, B.site = B.site, B.huc = B.huc, B.year = B.year, B.ar1 = B.ar1)
+
+tempDataSyncValidS$tempPredicted <- NA
+tempDataSyncValidS$tempPredicted <- predictTemp(data = tempDataSyncValidS, firstObsRows = firstObsRows.valid, evalRows = evalRows.valid, B.fixed = B.fixed, B.site = B.site, B.huc = B.huc, B.year = B.year, B.ar1 = B.ar1)
+
+
+library(ggplot2)
+ggplot(tempDataSyncValidS, aes(temp, tempPredicted)) + geom_point() + geom_abline(aes(1,1), colour = 'blue')
+tempDataSyncValidS$resid.r <- tempDataSyncValidS$temp - tempDataSyncValidS$tempPredicted
+rmse(tempDataSyncValidS$resid.r)
+
+
+library(ggplot2)
+ggplot(tempDataSyncS, aes(temp, tempPredicted)) + geom_point() + geom_abline(aes(1,1), colour = 'blue')
+
+tempDataSyncS$resid.r <- tempDataSyncS$temp - tempDataSyncS$tempPredicted
+
+rmse(tempDataSyncS$resid.r)
+rmse(tempDataSyncS$resid.ar1)
+
+tempDataSyncS$tempPredicted.jags <- tempDataSyncS$temp - tempDataSyncS$resid.ar1
+
+#summary(tempDataSyncS)
+
+ggplot(tempDataSyncS, aes(tempPredicted.jags, tempPredicted)) + geom_point()
+
+```
+
+
+```{r ending info}
+
+print(sessionInfo())
+
+```
+
+
+
+
+
