@@ -98,9 +98,10 @@ monitor.params <- c("residuals",
             "sigma.b.year")
 
 coda.tf <- T # currently only works in full for TRUE (using coda.samples)
-system.time(M.ar1 <- modelRegionalTempAR1(tempDataSyncS, cov.list, firstObsRows = firstObsRows, evalRows = evalRows, n.burn = 100, n.it = 500, n.thin = 1, nc = 3, coda = coda.tf, param.list = monitor.params)) # Slow with AR1: ~3-6 min per 100 iterations (13 min per 100 iter for site AR)
+system.time(M.ar1 <- modelRegionalTempAR1(tempDataSyncS, cov.list, firstObsRows = firstObsRows, evalRows = evalRows, n.burn = 1000, n.it = 1000, n.thin = 1, nc = 3, coda = coda.tf, param.list = monitor.params)) # Slow with AR1: ~3-6 min per 100 iterations (13 min per 100 iter for site AR)
 
-save(M.ar1, file = paste0(dataLocalDir, "northeast-mcmc.RData"))
+save(M.ar1, file = paste0(dataLocalDir, "mcmc-MA.RData"))
+save(cov.list, file = paste0(dataLocalDir, "covariate-list.RData"))
 
 ```
 
@@ -190,21 +191,120 @@ library(rjags)
 
 
 B.fixed <- dplyr::filter(coef.summary, grepl('^B.0', coef.summary$Parameter))
-B.fixed$coef <- colnames(data.cal$data.fixed)
+B.fixed$coef <- cov.list$fixed.ef
+
+mu.huc <- nameCoefs(coef.summary = coef.summary, rand.levels = levels(as.factor(tempDataSyncS$HUC8)), family = "mu.huc", name = "coef", conditional = FALSE, coefs = cov.list$site.ef)
+
+mu.year <- nameCoefs(coef.summary = coef.summary, rand.levels = levels(as.factor(tempDataSyncS$year)), family = "mu.year", name = "coef", conditional = FALSE, coefs = cov.list$year.ef)
+
+mu.ar1 <- dplyr::filter(coef.summary, grepl('^mu.ar1', coef.summary$Parameter))
+mu.ar1$coef <- mu.ar1$Parameter
+
+sigma.b.site <- nameCoefs(coef.summary = coef.summary, rand.levels = levels(as.factor(tempDataSyncS$site)), family = "sigma.b.site", conditional = FALSE, coefs = cov.list$site.ef, name = "coef")
+
+sigma.b.huc <- nameCoefs(coef.summary = coef.summary, rand.levels = levels(as.factor(tempDataSyncS$site)), family = "sigma.b.huc", conditional = FALSE, coefs = cov.list$site.ef, name = "coef")
+
+sigma.b.year <- nameCoefs(coef.summary = coef.summary, rand.levels = levels(as.factor(tempDataSyncS$year)), family = "sigma.b.year", conditional = FALSE, coefs = cov.list$year.ef, name = "coef")
+
+sigma.ar1 <- dplyr::filter(coef.summary, grepl('^sigma.ar1', coef.summary$Parameter))
 
 B.ar1 <- nameCoefs(coef.summary = coef.summary, rand.levels = levels(as.factor(tempDataSyncS$site)), family = 'B.ar1', name = "site")
 
-B.year <- nameCoefs(coef.summary = coef.summary, rand.levels = levels(as.factor(tempDataSyncS$year)), family = "B.year", coefs = colnames(data.cal$data.random.years), name = "year")
+B.site <- nameCoefs(coef.summary = coef.summary, rand.levels = levels(as.factor(tempDataSyncS$site)), family = "B.site", coefs = cov.list$site.ef, name = "site")
 
-B.site <- nameCoefs(coef.summary = coef.summary, rand.levels = levels(as.factor(tempDataSyncS$site)), family = "B.site", coefs = colnames(data.cal$data.random.sites), name = "site")
+B.huc <- nameCoefs(coef.summary = coef.summary, rand.levels = levels(as.factor(tempDataSyncS$HUC8)), family = "B.huc", coefs = cov.list$site.ef, name = "huc")
 
-B.huc <- nameCoefs(coef.summary = coef.summary, rand.levels = levels(as.factor(tempDataSyncS$HUC8)), family = "B.huc", coefs = colnames(data.cal$data.random.sites), name = "huc")
+B.year <- nameCoefs(coef.summary = coef.summary, rand.levels = levels(as.factor(tempDataSyncS$year)), family = "B.year", coefs = cov.list$year.ef, name = "year")
 
-mu.huc <- nameCoefs(coef.summary = coef.summary, rand.levels = levels(as.factor(tempDataSyncS$HUC8)), family = "mu.huc", name = "huc", conditional = FALSE, coefs = colnames(data.cal$data.random.sites))
 
-mu.year <- nameCoefs(coef.summary = coef.summary, rand.levels = levels(as.factor(tempDataSyncS$year)), family = "mu.year", name = "year", conditional = FALSE, coefs = colnames(data.cal$data.random.years))
+# Make correlation matrix of random huc effects
+cor.huc <- as.data.frame(matrix(NA, length(cov.list$site.ef), length(cov.list$site.ef)))
+names(cor.huc) <- cov.list$site.ef
+row.names(cor.huc) <- cov.list$site.ef
+for(k in 1:length(cov.list$site.ef)){
+  for(k.prime in 1:length(cov.list$site.ef)){
+    cor.huc[k, k.prime] <- coef.summary[which(coef.summary$Parameter == paste('rho.B.huc[',k,',',k.prime,']', sep="")), "mean"]
+  }
+}
+cor.huc <- round(cor.huc, digits=3)
+cor.huc[upper.tri(cor.huc, diag=TRUE)] <- ''
+cor.huc
 
-sigma.b.site <- nameCoefs(coef.summary = coef.summary, rand.levels = levels(as.factor(tempDataSyncS$site)), family = "sigma.b.site", conditional = FALSE, coefs = colnames(data.cal$data.random.sites))
+# Make correlation matrix of random year effects
+cor.year <- as.data.frame(matrix(NA, length(cov.list$year.ef), length(cov.list$year.ef)))
+names(cor.year) <- cov.list$year.ef
+row.names(cor.year) <- cov.list$year.ef
+for(l in 1:length(cov.list$year.ef)){
+  for(l.prime in 1:length(cov.list$year.ef)){
+    cor.year[l, l.prime] <- coef.summary[which(coef.summary$Parameter == paste('rho.B.year[',l,',',l.prime,']', sep="")), "mean"]
+  }
+}
+cor.year <- round(cor.year, digits=3)
+cor.year[upper.tri(cor.year, diag=TRUE)] <- ''
+cor.year
+
+
+
+(fix.ef <- rbind(B.fixed, select(mu.huc, -index), select(mu.year, -index), mu.ar1))
+
+coef.list <- list(B.fixed = B.fixed
+                  , mu.huc = mu.huc
+                  , mu.year = mu.year
+                  , mu.ar1 = mu.ar1
+, sigma.site = sigma.b.site
+, sigma.huc = sigma.b.huc
+, sigma.year = sigma.b.year
+, sigma.ar1 = sigma.ar1
+, cor.huc = cor.huc
+, cor.year = cor.year
+, B.site = B.site
+, B.huc = B.huc
+, B.year = B.year
+, B.ar1 = B.ar1
+)
+
+save(coef.list, file = "dataOut/coef-MA.Rdata")
+
+```
+
+
+# old using S4 object
+
+# combine model summary results into an S4 Object
+setClass("jagsSummary",
+         representation(fixEf="data.frame",
+                        ranEf="list",
+                        ranCor="list",
+                        BSite="data.frame",
+                        BHUC="data.frame",
+                        BYear="data.frame"))
+
+modSummary <- new("jagsSummary")
+modSummary@fixEf <- fix.ef
+modSummary@ranEf <- list(ranSite=ran.ef.site, ranHUC=ran.ef.huc, ranYear=ran.ef.year)
+modSummary@ranCor <- list(corSite=cor.huc, corYear=cor.year)
+modSummary@BSite <- B.site
+modSummary@BHUC <- B.huc
+modSummary@BYear <- B.year
+
+# modSummary <- NULL
+# modSummary$fixEf <- fix.ef
+# modSummary$ranEf <- list(ranSite=ran.ef.site, ranYear=ran.ef.year)
+# modSummary$ranCor <- list(corSite=cor.site, corYear=cor.year)
+# modSummary$BSite <- B.site
+# modSummary$BYear <- B.year
+
+#modSummary
+str(modSummary)
+head(modSummary@fixEf)
+head(modSummary@ranEf)
+head(modSummary@ranCor)
+head(modSummary@BSite)
+head(modSummary@BHUC)
+head(modSummary@BYear)
+
+
+
 
 # predict to new sites
 test.df <- data.frame(matrix(NA, 4, length(names(tempDataSyncS))))
@@ -225,12 +325,12 @@ B.site.new <- rbind(B.site[ , c("site", "mean")], test.B.site)
 
 
 
-
+```{r predict}
 tempDataSyncS$tempPredicted <- NA
-tempDataSyncS$tempPredicted <- predictTemp(data = tempDataSyncS, B.fixed = B.fixed, B.site = B.site, B.huc = B.huc, B.year = B.year, B.ar1 = B.ar1)
+tempDataSyncS$tempPredicted <- predictTemp(data = tempDataSyncS, coefs = coef.list, firstObsRows = firstObsRows, evalRows = evalRows)
 
 tempDataSyncValidS$tempPredicted <- NA
-tempDataSyncValidS$tempPredicted <- predictTemp(data = tempDataSyncValidS, firstObsRows = firstObsRows.valid, evalRows = evalRows.valid, B.fixed = B.fixed, B.site = B.site, B.huc = B.huc, B.year = B.year, B.ar1 = B.ar1)
+tempDataSyncValidS$tempPredicted <- predictTemp(data = tempDataSyncValidS, firstObsRows = firstObsRows.valid, evalRows = evalRows.valid, coefs = coef.list)
 
 
 library(ggplot2)
