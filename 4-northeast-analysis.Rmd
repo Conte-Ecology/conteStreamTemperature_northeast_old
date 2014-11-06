@@ -268,62 +268,6 @@ save(coef.list, file = "dataOut/coef-MA.Rdata")
 ```
 
 
-# old using S4 object
-
-# combine model summary results into an S4 Object
-setClass("jagsSummary",
-         representation(fixEf="data.frame",
-                        ranEf="list",
-                        ranCor="list",
-                        BSite="data.frame",
-                        BHUC="data.frame",
-                        BYear="data.frame"))
-
-modSummary <- new("jagsSummary")
-modSummary@fixEf <- fix.ef
-modSummary@ranEf <- list(ranSite=ran.ef.site, ranHUC=ran.ef.huc, ranYear=ran.ef.year)
-modSummary@ranCor <- list(corSite=cor.huc, corYear=cor.year)
-modSummary@BSite <- B.site
-modSummary@BHUC <- B.huc
-modSummary@BYear <- B.year
-
-# modSummary <- NULL
-# modSummary$fixEf <- fix.ef
-# modSummary$ranEf <- list(ranSite=ran.ef.site, ranYear=ran.ef.year)
-# modSummary$ranCor <- list(corSite=cor.site, corYear=cor.year)
-# modSummary$BSite <- B.site
-# modSummary$BYear <- B.year
-
-#modSummary
-str(modSummary)
-head(modSummary@fixEf)
-head(modSummary@ranEf)
-head(modSummary@ranCor)
-head(modSummary@BSite)
-head(modSummary@BHUC)
-head(modSummary@BYear)
-
-
-
-
-# predict to new sites
-test.df <- data.frame(matrix(NA, 4, length(names(tempDataSyncS))))
-names(test.df) <- names(tempDataSyncS)
-test.df$site <- c("one", "two", "three", "MAUSGS_WEST_BROOK")
-test.df$HUC8 <- c("a", "b", "c", "01070004")
-
-data.val <- prepDF(test.df)
-str(data.val)
-
-test.B.site <- test.df %>%
-  dplyr::filter(!(site %in% levels(as.factor(tempDataSync$site)))) %>%
-  dplyr::select(site) %>%
-  dplyr::mutate(mean = 0)
-
-B.site.new <- rbind(B.site[ , c("site", "mean")], test.B.site)
-
-
-
 
 ```{r predict}
 tempDataSyncS$tempPredicted <- NA
