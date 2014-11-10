@@ -23,7 +23,7 @@ dataOutDir <- paste0(baseDir, '/dataOut/')
 dataLocalDir <- paste0(baseDir, '/localData/')
 graphsDir <- paste0(baseDir, '/graphs/')
 
-load('localData/mcmc-list.RData')
+load('localData/jags.RData')
 load(paste0(dataOutDir, 'tempDataSync.RData'))
 
 # memory.limit(size = 1e6)
@@ -38,28 +38,29 @@ load(paste0(dataOutDir, 'tempDataSync.RData'))
 
 ```{r check model convergence and mixing}
 system.time(ggs.ar1 <- ggs(M.ar1)) # slow and memory intensive - 2 minutes with residuals saved in mcmc object and no other programs running but uses most of the memory on my 8 GB laptop
-gc() # clears all of the temporary variables stored by ggs and cuts hanging memory more than in half.
+gc(verbose = FALSE) # clears all of the temporary variables stored by ggs and cuts hanging memory more than in half.
 
+ggmcmc(ggs.ar1, file = 'localData/ggmcmc-B0.pdf', family = "B.0", plot = c("ggs_traceplot", "ggs_compare_partial", "ggs_autocorrelation"))
 
-ggs_traceplot(ggs.ar1, family = "B.0")
+ggmcmc(ggs.ar1, file = 'localData/ggmcmc-mu-huc.pdf', family = "mu.huc", plot = c("ggs_traceplot", "ggs_compare_partial", "ggs_autocorrelation"))
 
-ggs_traceplot(ggs.ar1, family = "mu.huc")
+ggmcmc(ggs.ar1, file = 'localData/ggmcmc-mu-year.pdf', family = "mu.year", plot = c("ggs_traceplot", "ggs_compare_partial", "ggs_autocorrelation"))
 
-ggs_traceplot(ggs.ar1, family = "mu.year")
+ggmcmc(ggs.ar1, file = 'localData/ggmcmc-mu-ar1.pdf', family = "mu.ar1", plot = c("ggs_traceplot", "ggs_compare_partial", "ggs_autocorrelation"))
 
-ggs_traceplot(ggs.ar1, family = "mu.ar1")
+ggmcmc(ggs.ar1, file = 'localData/ggmcmc-sigma-ar1.pdf', family = "sigma.ar1", plot = c("ggs_traceplot", "ggs_compare_partial", "ggs_autocorrelation"))
 
-ggs_traceplot(ggs.ar1, family = "sigma.ar1")
+ggmcmc(ggs.ar1, file = 'localData/ggmcmc-sigma-site.pdf', family = "sigma.b.site", plot = c("ggs_traceplot", "ggs_compare_partial", "ggs_autocorrelation"))
 
-ggs_traceplot(ggs.ar1, family = "sigma.b.site")
+ggmcmc(ggs.ar1, file = 'localData/ggmcmc-sigma-huc.pdf', family = "sigma.b.huc", plot = c("ggs_traceplot", "ggs_compare_partial", "ggs_autocorrelation"))
 
-ggs_traceplot(ggs.ar1, family = "sigma.b.huc")
-
-ggs_traceplot(ggs.ar1, family = "sigma.b.year")
+ggmcmc(ggs.ar1, file = 'localData/ggmcmc-sigma-year.pdf', family = "sigma.b.year", plot = c("ggs_traceplot", "ggs_compare_partial", "ggs_autocorrelation"))
 
 ggmcmc(ggs.ar1, file = 'localData/ggmcmc-ar1-rho-huc.pdf', family = "rho.B.huc", plot = "ggs_traceplot")
 
 ggmcmc(ggs.ar1, file = 'localData/ggmcmc-ar1-B-ar1.pdf', family = "B.ar1", plot = c("ggs_traceplot", "ggs_compare_partial", "ggs_autocorrelation"))
+
+gc(verbose = FALSE)
 
 ```
 
@@ -71,7 +72,7 @@ ggmcmc(ggs.ar1, file = 'localData/ggmcmc-ar1-B-ar1.pdf', family = "B.ar1", plot 
 system.time(coef.summary <- avgCoefs(ggs.ar1)) # 15s
 #tempDataSyncS$resid.ar1 <- dplyr::filter(coef.summary, grepl('^residuals', coef.summary$Parameter))$mean
 
-gc()
+gc(verbose = FALSE)
 
 B.fixed <- dplyr::filter(coef.summary, grepl('^B.0', coef.summary$Parameter))
 B.fixed$coef <- cov.list$fixed.ef
@@ -128,8 +129,12 @@ cor.year
 
 
 fix.ef <- rbind(B.fixed, select(mu.huc, -index), select(mu.year, -index), mu.ar1)
+rand.ef <- rbind(select(sigma.b.site, -index), select(sigma.b.huc, -index), select(sigma.b.year, -index), mutate(sigma.ar1, coef = Parameter))
 
-coef.list <- list(fix.ef = fix.ef
+mod.summary = rbind(fix.ef, rand.ef)
+
+coef.list <- list(fix.ef = fix.ef 
+                  ,rand.ef = rand.ef
                   ,B.fixed = B.fixed
                   , mu.huc = mu.huc
                   , mu.year = mu.year

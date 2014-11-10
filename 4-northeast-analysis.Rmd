@@ -30,7 +30,7 @@ graphsDir <- paste0(baseDir, '/graphs/')
 #source(paste0(baseDir, 'code/functions/temperatureModelingFunctions.R'))
 
 # load standardized and formatted data created with the 3-statModelPrep.Rmd script
-load(paste0(dataOutDir, 'tempDataSync-MA.RData'))
+load(paste0(dataOutDir, 'tempDataSync.RData'))
 ```
 
 ```{r eval = FALSE}
@@ -96,10 +96,10 @@ monitor.params <- c(#"residuals",
             "sigma.b.year")
 
 coda.tf <- T # currently only works in full for TRUE (using coda.samples)
-system.time(M.ar1 <- modelRegionalTempAR1(tempDataSyncS, cov.list, firstObsRows = firstObsRows, evalRows = evalRows, n.burn = 1000, n.it = 1000, n.thin = 1, nc = 3, coda = coda.tf, param.list = monitor.params)) # Slow with AR1: ~3-6 min per 100 iterations (13 min per 100 iter for site AR)
+system.time(M.ar1 <- modelRegionalTempAR1(tempDataSyncS, cov.list, firstObsRows = firstObsRows, evalRows = evalRows, n.burn = 50, n.it = 50, n.thin = 1, nc = 3, coda = coda.tf, param.list = monitor.params)) # Slow with AR1: ~3-6 min per 100 iterations (13 min per 100 iter for site AR)
 
-save(M.ar1, file = paste0(dataLocalDir, "mcmc-list.RData"))
-save(cov.list, file = paste0(dataLocalDir, "covariate-list.RData"))
+save(M.ar1, file = paste0(dataLocalDir, "jags.RData"))
+save(cov.list, file = paste0(dataLocalDir, "covariate_list.RData"))
 
 ```
 

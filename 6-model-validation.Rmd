@@ -23,15 +23,12 @@ dataLocalDir <- paste0(baseDir, '/localData/')
 graphsDir <- paste0(baseDir, '/graphs/')
 
 load(paste0(dataOutDir, 'tempDataSync.RData'))
-load(file = paste0(dataLocalDir, "covariate-list.RData"))
+load(file = paste0(dataLocalDir, "covariate_list.RData"))
 load(file = "dataOut/coef.Rdata")
 
 # memory.limit(size = 1e6)
 
 #system.time(summary.stats <- summary(M.ar1)) # takes a long time for full dataset. look for better solution
-
-tempDataSyncS$tempPredicted <- NA
-tempDataSyncS$tempPredicted <- predictTemp(data = tempDataSyncS, coef.list = coef.list, cov.list = cov.list, firstObsRows = firstObsRows, evalRows = evalRows, )
 
 ```
 
@@ -56,14 +53,10 @@ ggplot(tempDataSyncS, aes(temp, tempPredicted)) + geom_point() + geom_abline(aes
 tempDataSyncS$resid.r <- tempDataSyncS$temp - tempDataSyncS$tempPredicted
 
 rmse(tempDataSyncS$resid.r)
-#rmse(tempDataSyncS$resid.ar1)
 
-#tempDataSyncS$tempPredicted.jags <- tempDataSyncS$temp - tempDataSyncS$resid.ar1
+rmse.fit <- rmse(tempDataSyncS$resid.r)
 
-#summary(tempDataSyncS)
-
-#ggplot(tempDataSyncS, aes(tempPredicted.jags, tempPredicted)) + geom_point()
-
+rmse.table <- data.frame(rbind(rmse.fit, rmse.valid))
 ```
 
 ```{r residuals}
