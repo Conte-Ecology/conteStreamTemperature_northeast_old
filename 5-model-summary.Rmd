@@ -6,6 +6,9 @@ output: html_document
 ---
 
 ```{r}
+rm(list = ls()) 
+gc(verbose = FALSE)
+
 library(ggplot2)
 library(ggmcmc)
 library(dplyr)
@@ -24,7 +27,7 @@ dataLocalDir <- paste0(baseDir, '/localData/')
 graphsDir <- paste0(baseDir, '/graphs/')
 
 load('localData/jags.RData')
-load(paste0(dataOutDir, 'tempDataSync.RData'))
+load(paste0(dataLocalDir, 'tempDataSync.RData'))
 
 # memory.limit(size = 1e6)
 
@@ -61,6 +64,33 @@ ggmcmc(ggs.ar1, file = 'localData/ggmcmc-ar1-rho-huc.pdf', family = "rho.B.huc",
 ggmcmc(ggs.ar1, file = 'localData/ggmcmc-ar1-B-ar1.pdf', family = "B.ar1", plot = c("ggs_traceplot", "ggs_compare_partial", "ggs_autocorrelation"))
 
 gc(verbose = FALSE)
+
+```
+
+```{r means tables with rHat}
+
+intersectSeveral <- function(...) { Reduce(intersect, list(...)) } 
+
+# exclude the variables in the grep() statement
+# intersect works on pairs. the intersectSeveral function generates the intersection of multiple lists
+keepRows <- 
+  intersectSeveral(grep("B.site", x=ggs.ar1$Parameter,invert=TRUE),
+                   grep("B.huc", x=ggs.ar1$Parameter,invert=TRUE),
+                   grep("B.year", x=ggs.ar1$Parameter,invert=TRUE),
+                   grep("B.ar1", x=ggs.ar1$Parameter,invert=TRUE),
+                   grep("rho.B.huc", x=ggs.ar1$Parameter,invert=TRUE),
+                   grep("rho.B.year",x=ggs.ar1$Parameter,invert=TRUE)
+                  )
+
+rHat <- unique( ggs_Rhat(ggs.ar1[keepRows,])$data )
+
+# table of parameter estimates for MS
+m <- left_join(means,rHat[,c('Parameter','Rhat')])
+
+
+ggmcmc(ggs.ar1[keepRows,], file = "localData/ggmcmc-ar1-Rhat", plot = c("ggs_caterpillar"))
+
+
 
 ```
 
@@ -151,7 +181,7 @@ coef.list <- list(fix.ef = fix.ef
                   , B.ar1 = B.ar1
                   )
 
-save(coef.list, file = "dataOut/coef.Rdata")
+save(coef.list, file = paste0(dataLocalDir, "coef.Rdata")
 
 ```
 

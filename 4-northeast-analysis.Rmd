@@ -30,7 +30,7 @@ graphsDir <- paste0(baseDir, '/graphs/')
 #source(paste0(baseDir, 'code/functions/temperatureModelingFunctions.R'))
 
 # load standardized and formatted data created with the 3-statModelPrep.Rmd script
-load(paste0(dataOutDir, 'tempDataSync.RData'))
+load(paste0(dataLocalDir, 'tempDataSync.RData'))
 ```
 
 ```{r eval = FALSE}

@@ -23,7 +23,7 @@ dataOutDir <- paste0(baseDir, '/dataOut/')
 dataLocalDir <- paste0(baseDir, '/localData/')
 graphsDir <- paste0(baseDir, '/graphs/')
 
-load(paste0(dataOutDir, 'springFallBreakpoints.RData'))
+load(paste0(dataLocalDir, 'springFallBreakpoints.RData'))
 
 # r Choose data source
 

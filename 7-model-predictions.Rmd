@@ -34,11 +34,12 @@ graphsDir <- paste0(baseDir, '/graphs/')
 #source(paste0(baseDir, 'code/functions/temperatureModelingFunctions.R'))
 #source(paste0(baseDir, 'code/functions/dataIndexingFunctions.R'))
 
-load((paste0(dataOutDir, 'modSummary.RData')))
+#load((paste0(dataOutDir, 'modSummary.RData')))
+load(paste0(dataLocalDir, 'coef.RData'))
 load(paste0(dataLocalDir, 'daymetFullRecordObservedMASites.RData'))
-load(paste0(dataOutDir, 'tempDataSync.RData'))
+load(paste0(dataLocalDir, 'tempDataSync.RData'))
 
-load(paste0(dataOutDir, 'springFallBreakpoints.RData'))
+load(paste0(dataLocalDir, 'springFallBreakpoints.RData'))
 ```
 
 ```{r}

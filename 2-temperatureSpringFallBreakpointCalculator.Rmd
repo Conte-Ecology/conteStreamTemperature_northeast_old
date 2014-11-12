@@ -432,6 +432,6 @@ breaks$sourceFallBP[ huc4BP ] <- 'HUC4 mean'
 springFallBPs <- breaks[,c('site', 'year', 'finalSpringBP', 'sourceSpringBP', 'finalFallBP', 'sourceFallBP')]
 
 # Save the output
-save(springFallBPs, file = paste0(dataOutDir, outFile, '.RData'))
+save(springFallBPs, file = paste0(dataLocalDir, outFile, '.RData'))
 ```
 

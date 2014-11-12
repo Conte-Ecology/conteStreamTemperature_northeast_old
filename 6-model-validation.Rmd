@@ -10,7 +10,7 @@ library(ggplot2)
 library(dplyr)
 #library(nlme)
 library(devtools)
-#install_github("Conte-Ecology/conteStreamTemperature")
+install_github("Conte-Ecology/conteStreamTemperature")
 library(conteStreamTemperature)
 library(rjags)
 # need to load data.fixed, data.random.sites, data.random.years
@@ -22,13 +22,9 @@ dataOutDir <- paste0(baseDir, '/dataOut/')
 dataLocalDir <- paste0(baseDir, '/localData/')
 graphsDir <- paste0(baseDir, '/graphs/')
 
-load(paste0(dataOutDir, 'tempDataSync.RData'))
+load(paste0(dataLocalDir, 'tempDataSync.RData'))
 load(file = paste0(dataLocalDir, "covariate_list.RData"))
-load(file = "dataOut/coef.Rdata")
-
-# memory.limit(size = 1e6)
-
-#system.time(summary.stats <- summary(M.ar1)) # takes a long time for full dataset. look for better solution
+load(file = paste0(dataLocalDir, "coef.Rdata")
 
 ```
 
@@ -57,6 +53,10 @@ rmse(tempDataSyncS$resid.r)
 rmse.fit <- rmse(tempDataSyncS$resid.r)
 
 rmse.table <- data.frame(rbind(rmse.fit, rmse.valid))
+colnames(rmse.table) <- "rmse"
+
+save(rmse.table, paste0(dataLocalDir, "rmse_table.RData"))
+
 ```
 
 ```{r residuals}
