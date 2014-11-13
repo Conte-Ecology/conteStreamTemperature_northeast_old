@@ -28,6 +28,7 @@ graphsDir <- paste0(baseDir, '/graphs/')
 
 load('localData/jags.RData')
 load(paste0(dataLocalDir, 'tempDataSync.RData'))
+load(paste0(dataLocalDir, "covariate_list.RData"))
 
 # memory.limit(size = 1e6)
 
@@ -84,13 +85,7 @@ keepRows <-
 
 rHat <- unique( ggs_Rhat(ggs.ar1[keepRows,])$data )
 
-# table of parameter estimates for MS
-m <- left_join(means,rHat[,c('Parameter','Rhat')])
-
-
 ggmcmc(ggs.ar1[keepRows,], file = "localData/ggmcmc-ar1-Rhat", plot = c("ggs_caterpillar"))
-
-
 
 ```
 
@@ -161,7 +156,11 @@ cor.year
 fix.ef <- rbind(B.fixed, select(mu.huc, -index), select(mu.year, -index), mu.ar1)
 rand.ef <- rbind(select(sigma.b.site, -index), select(sigma.b.huc, -index), select(sigma.b.year, -index), mutate(sigma.ar1, coef = Parameter))
 
-mod.summary = rbind(fix.ef, rand.ef)
+mod.summary <- rbind(fix.ef, rand.ef)
+
+# table of parameter estimates for MS
+mod.summary <- left_join(mod.summary, rHat[,c('Parameter','Rhat')], by = "Parameter")
+
 
 coef.list <- list(fix.ef = fix.ef 
                   ,rand.ef = rand.ef
@@ -181,7 +180,8 @@ coef.list <- list(fix.ef = fix.ef
                   , B.ar1 = B.ar1
                   )
 
-save(coef.list, file = paste0(dataLocalDir, "coef.Rdata")
+save(coef.list, file = paste0(dataLocalDir, "coef.Rdata"))
+write.table(mod.summary, file = paste0(dataLocalDir, "modle_summary.csv"), sep = ",", row.names = F)
 
 ```
 
