@@ -22,6 +22,7 @@ outFile <- 'springFallBreakpoints'
 dataInDir  <- paste0(baseDir, '/dataIn/' )
 dataOutDir <- paste0(baseDir, '/dataOut/')
 graphsDir  <- paste0(baseDir, '/graphs/' )
+dataLocalDir <- paste0(baseDir, '/localData/')
 
 # Source functions (now should be part of package)
 #source(paste0(baseDir, 'code/functions/temperatureModelingFunctions.R'))
