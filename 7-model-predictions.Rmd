@@ -135,7 +135,7 @@ var.names <- c("Latitude", "Longitude", "airTemp", "airTempLagged1", "airTempLag
     evalRowsFull <- createEvalRows(fullDataSyncS)
     
    
-      #save(fullDataSync, fullDataSyncS, firstObsRows, evalRows, file = file)
+      #save(fullDataSync, fullDataSyncS, firstObsRowsFull, evalRowsFull, file = paste0(dataLocalDir, "fullDataSync.RData"))
 
 ```
 
@@ -143,13 +143,21 @@ var.names <- c("Latitude", "Longitude", "airTemp", "airTempLagged1", "airTempLag
 ```{r predict}
 #load(paste0(dataOutDir, "tempDataSync-daymet.Rdata"))
 
-fullDataSyncS$tempPredicted <- NA
-fullDataSyncS$tempPredicted <- predictTemp(data = fullDataSyncS, coef.list = coef.list, cov.list = cov.list, firstObsRows = firstObsRowsFull, evalRows = evalRowsFull)
+fullDataSyncS <- mutate(fullDataSyncS, huc = HUC8)
+fullDataSyncS <- predictTemp(data = fullDataSyncS, coef.list = coef.list, cov.list = cov.list)
 
 fullDataSync <- left_join(fullDataSync, select(fullDataSyncS, site, date, tempPredicted), by = c("site", "date"))
 ```
 
 
+```{r}
+test.pred <- filter(fullDataSyncS, !is.na(temp))
+
+rmse(na.omit(test.pred$temp - test.pred$tempPredicted))
+ggplot(test.pred, aes(temp, tempPredicted)) + geom_point()
+
+
+```
 
 
 
