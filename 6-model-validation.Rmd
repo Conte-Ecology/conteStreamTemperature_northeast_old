@@ -8,7 +8,7 @@ output: html_document
 ```{r}
 library(ggplot2)
 library(dplyr)
-#library(nlme)
+library(reshape2)
 library(devtools)
 install_github("Conte-Ecology/conteStreamTemperature")
 library(conteStreamTemperature)
@@ -24,17 +24,15 @@ graphsDir <- paste0(baseDir, '/graphs/')
 
 load(paste0(dataLocalDir, 'tempDataSync.RData'))
 load(file = paste0(dataLocalDir, "covariate_list.RData"))
-load(file = paste0(dataLocalDir, "coef.Rdata")
+load(file = paste0(dataLocalDir, "coef.Rdata"))
 
 ```
 
 
 ```{r predict}
-tempDataSyncS$tempPredicted <- NA
-tempDataSyncS$tempPredicted <- predictTemp(data = tempDataSyncS, coef.list = coef.list, cov.list = cov.list, firstObsRows = firstObsRows, evalRows = evalRows)
+tempDataSyncS <- predictTemp(data = tempDataSyncS, coef.list = coef.list, cov.list = cov.list)
 
-tempDataSyncValidS$tempPredicted <- NA
-tempDataSyncValidS$tempPredicted <- predictTemp(data = tempDataSyncValidS, firstObsRows = firstObsRows.valid, evalRows = evalRows.valid, coef.list = coef.list, cov.list = cov.list)
+tempDataSyncValidS <- predictTemp(data = tempDataSyncValidS, coef.list = coef.list, cov.list = cov.list)
 
 
 library(ggplot2)
@@ -47,10 +45,10 @@ library(ggplot2)
 ggplot(tempDataSyncS, aes(temp, tempPredicted)) + geom_point() + geom_abline(aes(1,1), colour = 'blue')
 
 tempDataSyncS$resid.r <- tempDataSyncS$temp - tempDataSyncS$tempPredicted
-
-rmse(tempDataSyncS$resid.r)
+tempDataSyncValidS$resid.r <- tempDataSyncValidS$temp - tempDataSyncValidS$tempPredicted
 
 rmse.fit <- rmse(tempDataSyncS$resid.r)
+rmse.valid <- rmse(tempDataSyncValidS$resid.r)
 
 rmse.table <- data.frame(rbind(rmse.fit, rmse.valid))
 colnames(rmse.table) <- "rmse"
@@ -96,6 +94,6 @@ acf(ar1.mat[ , "residuals[1]"], lag.max = 40, xlab = "Lag", ylab = "Correlation"
 acf(ar1.mat[ , "residuals[2]"], lag.max = 40, xlab = "Lag", ylab = "Correlation", main = "")
 
 # correlation in residuals over time 
-acf(tempDataSyncS$resid.r, lag.max = 100, xlab = "Lag", ylab = "Correlation", main = "") # not perfect but better than for non-AR model
+acf(tempDataSyncS$resid.r, lag.max = 100, xlab = "Lag", ylab = "Correlation", main = "", na.action = na.omit) # not perfect but better than for non-AR model
 
 ```
