@@ -1,0 +1,96 @@
+<!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Transitional//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-transitional.dtd">
+<html xmlns="http://www.w3.org/1999/xhtml">
+<head>
+  <meta http-equiv="Content-Type" content="text/html; charset=utf-8" />
+  <meta http-equiv="Content-Style-Type" content="text/css" />
+  <meta name="generator" content="pandoc" />
+  <title></title>
+  <style type="text/css">code{white-space: pre;}</style>
+  \usepackage[vmargin=1in,hmargin=1in]{geometry}
+</head>
+<body>
+<h1 id="daily-model-of-stream-temperature-for-regional-predictions">Daily model of stream temperature for regional predictions</h1>
+<h3 id="daniel-j.-hocking-ben-letcher-and-kyle-oneil">Daniel J. Hocking, Ben Letcher, and Kyle O'Neil</h3>
+<p>*Daniel J. Hocking (<script type="text/javascript">
+<!--
+h='&#x75;&#x73;&#x67;&#x73;&#46;&#x67;&#x6f;&#118;';a='&#64;';n='&#100;&#104;&#x6f;&#x63;&#x6b;&#x69;&#110;&#x67;';e=n+a+h;
+document.write('<a h'+'ref'+'="ma'+'ilto'+':'+e+'" clas'+'s="em' + 'ail">'+e+'<\/'+'a'+'>');
+// -->
+</script><noscript>&#100;&#104;&#x6f;&#x63;&#x6b;&#x69;&#110;&#x67;&#32;&#x61;&#116;&#32;&#x75;&#x73;&#x67;&#x73;&#32;&#100;&#x6f;&#116;&#32;&#x67;&#x6f;&#118;</noscript>), US Geological Survey, Conte Anadromous Fish Research Center, Turners Falls, MA, USA</p>
+<h2 id="abstract">Abstract</h2>
+<p>Set up the problem. Explain how you solve it. Tell what you find. Explain why it's the best thing ever.</p>
+<h2 id="introduction">Introduction</h2>
+<p><strong>Options:</strong> Water Research, <strong>Water Resources Research</strong>, Freshwater Biology, Journal of Hydrology, Ecohydrology, Journal of Environmental Quality, Hydrobiologia, JAWRA</p>
+<p>Temperature is a critical factor in regulating the physical, chemical, and biological properties of streams. Warming stream temperatures decrease dissolved oxygen, decrease water density, and alter the circulation and stratification patterns of the stream (refs). Biogeochemical processes such as nitrogen and carbon cycling are also temperature dependent and affect primary production, decomposition, and eutrophication (refs). Both physical properties and biogeochemical processes influence the suitability for organisms living in and using the stream habitat beyond just primary producers. Additionally, temperature can have direct effects on the biota, especially ectotherms such as invertebrates, amphibians, and fish <span class="citation">[<em>Xu et al.</em>, 2010b, 2010a; <em>Al-Chokhachy et al.</em>, 2013; e.g. <em>Kanno et al.</em>, 2013]</span>. Given commercial and recreational interests, there is a large body of literature describing the effects of temperature on fish, particularly the negative effects of warming temperatures on cool-water fishes such as salmonids (refs). Finally, stream temperature can even affect electricity, drinking water, and recreation (see van Vliet et al 2011). Therefore, understanding and predicting stream temperatures are important for a multitude of stakeholders.</p>
+<p>Stream temperature models can be used for explanatory purposes (understanding factors and mechanisms affecting temperature) and for prediction. Predictions can be spatial or temporal (forecasting and hindcasting). Forecasting can provide immediate information such as the expected temperature the next hour, day, or week as well as long-term information about expected temperatures months, years, and decades in the future.</p>
+<p>Stream temperature models are generally divided into two categories: deterministic and statistical (ref: Benyahya et al 2007 review).</p>
+<p>Deterministic models are based on heat transfer and are often modeled using energy budgets (ref: Benyahya et al. 2007). The models require large amounts of detailed information on the physical properties of the stream and adjacent landscape as well as hydrology and meteorology. These models are useful for detailed site assessments and scenario testing. However, the data requirements prevent the models from being applied over large spatial extents.</p>
+<p>Statistical models, in contrast, require less detailed site-level data and therefore can be applied over greater spatial extents than deterministic models.</p>
+<p>Additionally, parametric, nonlinear regression models have been developed to provide more information on mechanisms than traditional statistical models (ref: Mohseni 1998).</p>
+<p>We describe a statistical model of daily stream temperature and apply it to a large geographical area. We use the model to predict daily stream temperature across the northeastern United States over a 30-year time record.</p>
+<h2 id="methods">Methods</h2>
+<p>Statistical models of stream temperature often rely on the close relationship between air temperature and water temperature. However, this relationship breaks down during the winter in temperature zones, particularly as streams freeze, thereby changing their thermal and properties. Many researchers and managers are interested in the non-winter effects of temperature. The winter period when phase change and ice cover alter the air-water relationship differs in both time (annually) and space. We developed an index of air-water synchrony so we can model the portion of the year that it not affected by freezing properties.</p>
+<p>We used a generalized linear mixed model to….</p>
+<p>correlation in space</p>
+<p>incorporate short time series as well as long time series from different sites</p>
+<p>incorporate disjunct time series from sites</p>
+<h2 id="results">Results</h2>
+<p>Explain what you found. Avoid blind <em>P-values</em> (or avoid <em>P-values</em> altogether)</p>
+<h2 id="discussion">Discussion</h2>
+<p>Disagreement (conflicting evidence?) regarding the drivers of stream temperature</p>
+<h2 id="acknowledgements">Acknowledgements</h2>
+<p>Thanks to Ethan White, Karthik Ram, Carl Boettiger, Ben Morris, and <a href="http://software-carpentry.org/">Software Carpentry</a> for getting me started with the skills needed to <a href="http://inundata.org/2012/12/04/how-to-ditch-word/">ditch MS Word</a> and produce more reproducible research.</p>
+<h2 id="tables">Tables</h2>
+<p>Table 1: Example Markdown table</p>
+<table>
+<colgroup>
+<col width="20%" />
+<col width="11%" />
+<col width="8%" />
+<col width="13%" />
+<col width="12%" />
+<col width="18%" />
+</colgroup>
+<thead>
+<tr class="header">
+<th align="left">Name</th>
+<th align="left">col2</th>
+<th align="left">col3</th>
+<th align="left">col4</th>
+<th align="left">col5</th>
+<th align="left">Comments</th>
+</tr>
+</thead>
+<tbody>
+<tr class="odd">
+<td align="left"><p>Brook Trout</p></td>
+<td align="left"><p>1</p></td>
+<td align="left"><p>big</p></td>
+<td align="left"><p>few</p></td>
+<td align="left"><p>2.2</p></td>
+<td align="left"><p>Ecology &amp; life history data associated with trout</p></td>
+</tr>
+<tr class="even">
+<td align="left"><p><em>Desmognathus</em> <em>fuscus</em></p></td>
+<td align="left"><p>100</p></td>
+<td align="left"><p>small</p></td>
+<td align="left"><p>many</p></td>
+<td align="left"><p>0.3</p></td>
+<td align="left"><p>Widespread salamander species</p></td>
+</tr>
+</tbody>
+</table>
+<h2 id="figures">Figures</h2>
+<p>Figure 1. Example of adding a figure.</p>
+<div class="figure">
+<img src="Figures/MADEP_W2033_T1.png" alt="Figure1" /><p class="caption">Figure1</p>
+</div>
+<div class="references">
+<h2>Literature Cited</h2>
+<p>Al-Chokhachy, R., J. Alder, S. Hostetler, R. Gresswell, and B. Shepard (2013), Thermal controls of Yellowstone cutthroat trout and invasive fishes under climate change, <em>Global change biology</em>, <em>19</em>(10), 3069–81, doi:<a href="http://dx.doi.org/10.1111/gcb.12262">10.1111/gcb.12262</a>.</p>
+<p>Kanno, Y., J. Vokoun, and B. Letcher (2013), Paired stream-air temperature measurements reveal fine-scale thermal heterogeneity within headwater Brook Trout stream networks, <em>River Research and Applications</em>, <em>30</em>(6), 745–755, doi:<a href="http://dx.doi.org/10.1002/rra">10.1002/rra</a>.</p>
+<p>Xu, C., B. H. Letcher, and K. H. Nislow (2010a), Context-specific influence of water temperature on brook trout growth rates in the field, <em>Freshwater Biology</em>, <em>55</em>(11), no–no, doi:<a href="http://dx.doi.org/papers2://publication/doi/10.1111/j.1365-2427.2010.02430.x">papers2://publication/doi/10.1111/j.1365-2427.2010.02430.x</a>.</p>
+<p>Xu, C. L., B. H. Letcher, and K. H. Nislow (2010b), Size-dependent survival of brook trout Salvelinus fontinalis in summer: effects of water temperature and stream flow, <em>Journal of Fish Biology</em>, <em>76</em>(10), 2342–2369, doi:<a href="http://dx.doi.org/papers2://publication/doi/10.1111/j.1095-8649.2010.02619.x">papers2://publication/doi/10.1111/j.1095-8649.2010.02619.x</a>.</p>
+</div>
+</body>
+</html>
