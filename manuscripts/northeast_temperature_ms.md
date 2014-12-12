@@ -22,11 +22,13 @@ Temperature is a critical factor in regulating the physical, chemical, and biolo
 
 Stream temperature models can be used for explanatory purposes (understanding factors and mechanisms affecting temperature) and for prediction. Predictions can be spatial or temporal (forecasting and hindcasting). Forecasting can provide immediate information such as the expected temperature the next hour, day, or week as well as long-term information about expected temperatures months, years, and decades in the future.
 
-Stream temperature models are generally divided into two categories: deterministic and statistical (ref: Benyahya et al 2007 review). 
+Stream temperature models are generally divided into three categories: deterministic (also called process-based or mechanistic), stochastic, and statistical [@Chang2013; @Caissie2006]. 
 
-Deterministic models are based on heat transfer and are often modeled using energy budgets (ref: Benyahya et al. 2007). The models require large amounts of detailed information on the physical properties of the stream and adjacent landscape as well as hydrology and meteorology. These models are useful for detailed site assessments and scenario testing. However, the data requirements prevent the models from being applied over large spatial extents.
+Deterministic models are based on heat transfer and are often modeled using energy budgets [@Benyahya2007; @Caisse2006]. The models require large amounts of detailed information on the physical properties of the stream and adjacent landscape as well as hydrology and meteorology. These models are useful for detailed site assessments and scenario testing. However, the data requirements prevent the models from being applied over large spatial extents.
 
-Statistical models, in contrast, require less detailed site-level data and therefore can be applied over greater spatial extents than deterministic models.
+Stochastic models attempt to combine pattern (seasonal and spatial trends) with the near-random deviations of environmental data. Stochastic techniques include harmonic trends with deviance analysis, wavelet analysis, and artificial neural networks. These models generally rely on relationships between air and water temperature (ref: DeWeber et al. 2015) [@Webb2008; @Caissie2006]
+
+Statistical models also often rely on relationships between air and water temperatures, but also generally include a variety of other predictor variables including landscape and land-use characteristics. In contrast with deterministic approaches, statistical models require less detailed site-level data and therefore can be applied over greater spatial extents than process-based models.
 
 Additionally, parametric, nonlinear regression models have been developed to provide more information on mechanisms than traditional statistical models (ref: Mohseni 1998).
 
