@@ -34,6 +34,10 @@ document.write('<a h'+'ref'+'="ma'+'ilto'+':'+e+'" clas'+'s="em' + 'ail">'+e+'<\
 <p>correlation in space</p>
 <p>incorporate short time series as well as long time series from different sites</p>
 <p>incorporate disjunct time series from sites</p>
+<p><br /><span class="math"><em>t</em><em>w</em><sub><em>s</em>, <em>h</em>, <em>d</em></sub> <em>N</em>(<em>μ</em><sub><em>s</em>, <em>h</em>, <em>d</em></sub>, <em>σ</em>)</span><br /></p>
+<p><br /><span class="math">$$
+\frac{C}{f}=\alpha\left(\frac{N}{L}\right)^{\beta+1}e^\epsilon
+$$</span><br /></p>
 <h2 id="results">Results</h2>
 <p>Explain what you found. Avoid blind <em>P-values</em> (or avoid <em>P-values</em> altogether)</p>
 <h2 id="discussion">Discussion</h2>

@@ -45,6 +45,18 @@ incorporate short time series as well as long time series from different sites
 
 incorporate disjunct time series from sites
 
+$$
+tw_{s,h,d} \sim N(\mu_{s,h,d},\sigma)
+$$
+
+$$
+tw_{s,d} \sim \mathcal{N} (\mu,\sigma^2)
+$$
+
+
+$$
+\frac{C}{f}=\alpha\left(\frac{N}{L}\right)^{\beta+1}e^\epsilon
+$$
 
 
 
