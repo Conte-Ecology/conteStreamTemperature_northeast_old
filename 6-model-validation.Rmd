@@ -53,7 +53,7 @@ rmse.valid <- rmse(tempDataSyncValidS$resid.r)
 rmse.table <- data.frame(rbind(rmse.fit, rmse.valid))
 colnames(rmse.table) <- "rmse"
 
-save(rmse.table, paste0(dataLocalDir, "rmse_table.RData"))
+save(rmse.table, file = paste0(dataLocalDir, "rmse_table.RData"))
 
 ```
 

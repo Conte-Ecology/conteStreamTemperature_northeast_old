@@ -28,15 +28,15 @@ load(paste0(dataLocalDir, 'springFallBreakpoints.RData'))
 # r Choose data source
 
 #Northeast
-CTDEP  <- F
+CTDEP  <- T
 MAFW   <- T
 MAUSGS <- T
 MADEP  <- T 
-NHFG   <- F
-NHDES  <- F
-USFS   <- F
-VTFWS  <- F
-MEDMR  <- F
+NHFG   <- T
+NHDES  <- T
+USFS   <- T
+VTFWS  <- T
+MEDMR  <- T
 
 #Montana
 MTUSGSYellowstone <- F

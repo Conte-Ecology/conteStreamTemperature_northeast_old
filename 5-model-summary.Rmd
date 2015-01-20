@@ -181,7 +181,7 @@ coef.list <- list(fix.ef = fix.ef
                   )
 
 save(coef.list, file = paste0(dataLocalDir, "coef.Rdata"))
-write.table(mod.summary, file = paste0(dataLocalDir, "modle_summary.csv"), sep = ",", row.names = F)
+write.table(mod.summary, file = paste0(dataLocalDir, "model_summary.csv"), sep = ",", row.names = F)
 
 ```
 

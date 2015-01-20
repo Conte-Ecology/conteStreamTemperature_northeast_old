@@ -43,8 +43,8 @@ print(getwd())
 ####
 
 fixed.ef <- c("intercept" 
-              , "Latitude" 
-              , "Longitude" 
+             # , "Latitude" 
+            #  , "Longitude" 
               , "TotDASqKM" 
               , "Forest" 
               , "ReachElevationM" 
